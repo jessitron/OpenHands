@@ -14,8 +14,11 @@ import "./i18n";
 import { QueryClientProvider } from "@tanstack/react-query";
 import store from "./store";
 import OpenHands from "./api/open-hands";
-import { displayErrorToast } from "./utils/custom-toast-handlers";
 import { queryClient } from "./query-client-config";
+
+import installOpenTelemetry from "./otel-config";
+
+installOpenTelemetry();
 
 function PosthogInit() {
   const [posthogClientKey, setPosthogClientKey] = React.useState<string | null>(
@@ -28,7 +31,8 @@ function PosthogInit() {
         const config = await OpenHands.getConfig();
         setPosthogClientKey(config.POSTHOG_CLIENT_KEY);
       } catch (error) {
-        displayErrorToast("Error fetching PostHog client key");
+        // this is expected running locally. Also nobody cares, this is for you not for the customer
+        console.log("Error fetching PostHog client key");
       }
     })();
   }, []);
