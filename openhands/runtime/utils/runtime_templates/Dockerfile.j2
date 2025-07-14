@@ -187,3 +187,12 @@ RUN chmod a+rwx /openhands/code/openhands/__init__.py
 
 # Install extra dependencies if specified
 {% if extra_deps %}RUN {{ extra_deps }} {% endif %}
+
+ENV OTEL_SERVICE_NAME="openhands-runtime"
+ENV OTEL_TRACES_EXPORTER="otlp"
+ENV OTEL_LOGS_EXPORTER="otlp"
+ENV OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+ENV OTEL_EXPORTER_OTLP_ENDPOINT="https://api.honeycomb.io:443"
+ENV OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=hcaik_01jzrfabr5kafh7dyj2tvf5v5tyryategbprk1k8ecqdn94pq408cagfc6"
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+ENV OTEL_DEBUG=true

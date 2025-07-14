@@ -14,7 +14,7 @@ export default function installOpenTelemetry() {
     const sdk = new HoneycombWebSDK({
       apiKey:
         "hcaik_01jzrfabr5kafh7dyj2tvf5v5tyryategbprk1k8ecqdn94pq408cagfc6",
-      serviceName: "react-frontend",
+      serviceName: "openhands-ui",
       instrumentations: [
         getWebAutoInstrumentations({
           "@opentelemetry/instrumentation-xml-http-request": defaults,

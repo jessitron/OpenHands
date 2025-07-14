@@ -8,6 +8,7 @@ DEFAULT_PYTHON_PREFIX = [
     'openhands',
     'poetry',
     'run',
+    'opentelemetry-instrument'
 ]
 DEFAULT_MAIN_MODULE = 'openhands.runtime.action_execution_server'
 

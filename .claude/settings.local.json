@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__honeycomb__list_environments",
+      "mcp__honeycomb__list_datasets",
+      "mcp__honeycomb__run_unsaved_query"
+    ],
+    "deny": []
+  }
+}

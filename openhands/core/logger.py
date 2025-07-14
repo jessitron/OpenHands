@@ -42,6 +42,9 @@ else:
 if DEBUG:
     LOG_LEVEL = 'DEBUG'
 
+# always send OpenTelemetry, because I want to
+litellm.callbacks = ["otel"]
+
 LOG_TO_FILE = os.getenv('LOG_TO_FILE', 'False').lower() in ['true', '1', 'yes']
 DISABLE_COLOR_PRINTING = False
 

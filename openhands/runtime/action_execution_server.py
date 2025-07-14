@@ -74,10 +74,12 @@ from openhands.runtime.utils.memory_monitor import MemoryMonitor
 from openhands.runtime.utils.runtime_init import init_user_and_working_directory
 from openhands.runtime.utils.system_stats import get_system_stats
 from openhands.utils.async_utils import call_sync_from_async, wait_all
+from opentelemetry import trace
 
 if sys.platform == 'win32':
     from openhands.runtime.utils.windows_bash import WindowsPowershellSession
 
+tracer = trace.get_tracer(__name__)
 
 class ActionRequest(BaseModel):
     action: dict
@@ -830,20 +832,25 @@ if __name__ == '__main__':
 
     @app.post('/execute_action')
     async def execute_action(action_request: ActionRequest):
-        assert client is not None
-        try:
-            action = event_from_dict(action_request.action)
-            if not isinstance(action, Action):
-                raise HTTPException(status_code=400, detail='Invalid action type')
-            client.last_execution_time = time.time()
-            observation = await client.run_action(action)
-            return event_to_dict(observation)
-        except Exception as e:
-            logger.error(f'Error while running /execute_action: {str(e)}')
-            raise HTTPException(
-                status_code=500,
-                detail=traceback.format_exc(),
-            )
+        with tracer.start_as_current_span('execute_action') as span:
+            assert client is not None
+            try:
+                action: Action = event_from_dict(action_request.action)
+                if not isinstance(action, Action):
+                    span.set_attribute('app.error', 'Invalid action type')
+                    raise HTTPException(status_code=400, detail='Invalid action type')
+                span.set_attribute('app.action', action.action)
+                span.set_attribute('app.action_id', action.id)
+                span.set_attribute('app.action_tostring', str(action))
+                client.last_execution_time = time.time()
+                observation = await client.run_action(action)
+                return event_to_dict(observation)
+            except Exception as e:
+                logger.error(f'Error while running /execute_action: {str(e)}')
+                raise HTTPException(
+                    status_code=500,
+                    detail=traceback.format_exc(),
+                )
 
     @app.post('/update_mcp_server')
     async def update_mcp_server(request: Request):
