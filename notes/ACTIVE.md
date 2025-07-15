@@ -1,134 +1,98 @@
-# Goal: instrument the crucial parts of the openhands server
+# Current Work
 
-I want to find out how the agent works. I want to see every LLM call, and the loop of making calls, and decisions that it makes.
+I want to understand this application. I'm going to instrument it with OpenTelemetry, and get it to explain itself. (Not yet though)
 
-## FIRST PRIORITY
+I'm starting with the command-line version of the app, as described in @docs/usage/how-to/cli-mode.mdx -- but I'll be running it in development mode, as in @oh-cli
 
-get built-in litellm instrumentation working!
+I have already added general OpenTelemetry instrumentation to the repo and to the app startup. It goes to Honeycomb, environment banana, dataset openhands-cli. If you have the Honeycomb MCP, you can find traces there. Currently, I'm only getting a few spans for jinja and HTTP libraries.
 
-The [instruction](https://docs.litellm.ai/docs/observability/opentelemetry_integration) page says to add: `litellm.callbacks = ["otel"]`
+The next step in instrumentation will be custom, describing the app's flow. Before we do that, I want to understand the flow.
 
-**ANSWER: Add it in `openhands/core/logger.py`**
+## Flow of the CLI app
 
-This file already imports and configures litellm (lines 24-40). Add the callback line right after the existing litellm configuration:
+The CLI app follows this main execution flow:
 
-```python
-# Around line 41, after the existing litellm config:
-litellm.callbacks = ["otel"]
-```
+### 1. Entry Point (`openhands/cli/main.py:main()`)
+- Entry point calls `main_with_loop()` which sets up event loop and exception handling
+- Parses command line arguments using `parse_arguments()`
+- Sets up logging level and loads configuration from TOML files and CLI args
 
-This is the perfect spot because:
+### 2. Initial Setup (`openhands/cli/main.py:main_with_loop()`)
+- Creates `FileSettingsStore` for persistent settings
+- If no settings exist, runs setup flow via `run_setup_flow()` to configure LLM settings
+- Loads saved settings (agent, LLM model, API key, etc.)
+- Sets CLI-specific defaults like runtime='cli' and confirmation_mode=True
 
-1. litellm is already imported here
-2. Other litellm global settings are configured here (suppress_debug_info, set_verbose)
-3. This runs early in the application startup
-4. It's centralized with other logging configuration
+### 3. Session Creation (`openhands/cli/main.py:run_session()`)
+Each session follows this pattern:
+- **Session ID Generation**: Creates unique session ID via `generate_sid()`
+- **Component Creation** (all from `openhands/core/setup.py`):
+  - `create_agent()` - Creates the AI agent with LLM configuration
+  - `create_runtime()` - Creates sandbox runtime environment (CLI runtime by default)
+  - `create_controller()` - Creates AgentController to manage agent lifecycle
+  - `create_memory()` - Creates Memory component for information retrieval
+- **Repository Setup**: If selected_repo is configured, clones/initializes it
+- **MCP Integration**: Adds MCP (Model Context Protocol) tools if enabled
+- **Event Stream Setup**: Sets up event subscription and callbacks
 
-## FOR LATER - STOP HERE
+### 4. Main Event Loop (`openhands/core/loop.py:run_agent_until_done()`)
+- Runs until agent reaches terminal state (STOPPED, ERROR, etc.)
+- Uses `controller.state.agent_state` to track current state
+- Implements status callbacks for error handling
 
-### 1. Main Agent Execution Loop
+### 5. Key Components and Interactions
 
-**Location**: `openhands/core/loop.py` - `run_agent_until_done()`
+#### AgentController (`openhands/controller/agent_controller.py`)
+- **Central orchestrator** that manages agent lifecycle and state transitions
+- Handles events from event stream via `on_event()` and `_on_event()`
+- Implements state machine with states like RUNNING, AWAITING_USER_INPUT, FINISHED
+- Manages agent delegation for multi-agent scenarios
+- Controls confirmation mode for sensitive operations
 
-- Simple loop that runs until agent reaches terminal state
-- Sleeps 1 second between checks
-- **Instrument**: Loop iterations, state transitions, total execution time
+#### Event Stream (`openhands/events/stream.py`)
+- **Message bus** for all communication between components
+- Handles Actions (from agents) and Observations (from environment)
+- Supports multiple subscribers (AGENT_CONTROLLER, MEMORY, MAIN)
+- Provides event persistence and replay capabilities
 
-**Location**: `openhands/controller/agent_controller.py` - `_step()` method
+#### Runtime (`openhands/runtime/base.py`)
+- **Sandbox environment** providing bash shell, browser, file operations
+- CLI runtime specifically provides command-line interface
+- Handles action execution (CmdRunAction, FileEditAction, etc.)
+- Manages plugins and microagents
 
-- Core agent step execution (line ~758)
-- Checks agent state, handles pending actions
-- Calls `self.agent.step(self.state)` to get next action
-- **Instrument**: Step timing, action generation, state changes
+#### Memory (`openhands/memory/memory.py`) 
+- **Information retrieval system** that responds to RecallAction events
+- Loads microagents from global, user, and repository directories
+- Provides workspace context on first user message
+- Handles knowledge retrieval for subsequent queries
 
-### 2. LLM Call Chain (THE CRITICAL PATH)
+#### Agent (`openhands/agenthub/*/`)
+- **AI decision-making component** that processes state and returns actions
+- Different agent types (CodeAct, browsing, etc.) in agenthub/
+- Uses LLM to generate responses based on conversation history
+- Implements specific behavioral patterns for different use cases
 
-**Location**: `openhands/agenthub/codeact_agent/codeact_agent.py` - `step()` method
+### 6. User Interaction Flow
+1. User starts CLI with `openhands` command
+2. System displays banner and welcome message
+3. User enters task or command at prompt (`>`)
+4. Commands starting with `/` are handled by `handle_commands()` 
+5. Regular messages become MessageAction events
+6. Agent processes message and generates response actions
+7. Actions are executed in runtime, producing observations
+8. Cycle continues until user exits or agent finishes
 
-- Line ~150: Main agent decision point
-- Line ~191: Builds messages from conversation history
-- Line ~197: **THE LLM CALL** - `self.llm.completion(**params)`
-- Line ~199: Parses response into actions
-- **Instrument**: Prompt construction, LLM latency, response parsing
+### 7. State Management
+- **AgentState enum**: RUNNING, AWAITING_USER_INPUT, FINISHED, ERROR, etc.
+- **State persistence**: Sessions saved to `~/.openhands/sessions`
+- **Confirmation mode**: Requires user approval for sensitive operations
+- **Pause/Resume**: Ctrl-P to pause, `/resume` to continue
 
-**Location**: `openhands/llm/llm.py` - `wrapper()` function (line ~220)
-
-- Actual LLM completion call with retry logic
-- Line ~299: Records start time for latency
-- Line ~314: Makes the litellm call
-- **Instrument**: Request/response, tokens, cost, retries, latency
-
-### 3. Action Execution & Observation Loop
-
-**Location**: `openhands/runtime/base.py` - `_handle_action()` method
-
-- Line ~335: Handles incoming actions from agent
-- Line ~345: Executes action in runtime environment
-- Returns observations back to agent
-- **Instrument**: Action type, execution time, success/failure
-
-### 4. Event Flow & Communication
-
-**Location**: `openhands/events/stream.py` - `add_event()` method
-
-- Line ~164: All events flow through here
-- Assigns IDs, timestamps, sources to events
-- **Instrument**: Event throughput, queue depth, processing latency
-
-### 5. Agent State Management
-
-**Location**: `openhands/controller/agent_controller.py` - `set_agent_state_to()` method
-
-- Line ~568: State transitions (RUNNING, WAITING, ERROR, etc.)
-- Critical for understanding agent lifecycle
-- **Instrument**: State duration, transition reasons
-
-## The Decision-Making Flow to Instrument
-
-```
-1. AgentController._step()
-   ↓
-2. CodeActAgent.step(state)
-   ↓
-3. _get_messages() - builds prompt from history
-   ↓
-4. llm.completion() - THE LLM CALL
-   ↓
-5. response_to_actions() - parses LLM response
-   ↓
-6. Action added to EventStream
-   ↓
-7. Runtime._handle_action() - executes action
-   ↓
-8. Observation returned to EventStream
-   ↓
-9. State updated with action/observation
-   ↓
-10. Loop continues...
-```
-
-## Specific Instrumentation Points
-
-### LLM Calls (High Priority)
-
-- **File**: `openhands/llm/llm.py`, line ~314
-- **What**: Every completion call with prompt, response, tokens, cost
-- **Why**: Core AI decision-making visibility
-
-### Agent Steps (High Priority)
-
-- **File**: `openhands/controller/agent_controller.py`, line ~758
-- **What**: Step timing, action generated, state before/after
-- **Why**: Agent behavior and performance
-
-### Action Execution (Medium Priority)
-
-- **File**: `openhands/runtime/base.py`, line ~335
-- **What**: Action type, execution time, success/error
-- **Why**: Understanding what agent actually does
-
-### Event Processing (Medium Priority)
-
-- **File**: `openhands/events/stream.py`, line ~164
-- **What**: Event throughput, queue metrics
-- **Why**: System performance and bottlenecks
+### 8. Key Files for Instrumentation
+- `openhands/cli/main.py:run_session()` - Session lifecycle
+- `openhands/controller/agent_controller.py:_step()` - Agent decision steps  
+- `openhands/core/loop.py:run_agent_until_done()` - Main execution loop
+- `openhands/events/stream.py` - Event processing
+- `openhands/runtime/base.py` - Runtime action execution
+- `openhands/memory/memory.py` - Information retrieval

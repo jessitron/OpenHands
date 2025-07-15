@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+export OTEL_SERVICE_NAME="openhands-cli"
+
+poetry run opentelemetry-instrument python -m openhands.cli.main
