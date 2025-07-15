@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import pathlib
 import platform
@@ -830,6 +831,8 @@ def setup_config_from_args(args: argparse.Namespace) -> OpenHandsConfig:
     """
     # Load base config from toml and env vars
     config = load_openhands_config(config_file=args.config_file)
+    print("Jess is here again")
+    logging.info("Here I am, in the setup config from args function")
 
     # Override with command line arguments if provided
     if args.llm_config:

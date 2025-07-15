@@ -374,7 +374,7 @@ else:
     openhands_logger.addHandler(get_console_handler(current_log_level))
 
 openhands_logger.addFilter(SensitiveDataFilter(openhands_logger.name))
-openhands_logger.propagate = False
+# openhands_logger.propagate = False # does this interfere with otel?
 openhands_logger.debug('Logging initialized')
 
 LOG_DIR = os.path.join(
@@ -390,9 +390,9 @@ if LOG_TO_FILE:
     openhands_logger.debug(f'Logging to file in: {LOG_DIR}')
 
 # Exclude LiteLLM from logging output as it can leak keys
-logging.getLogger('LiteLLM').disabled = True
-logging.getLogger('LiteLLM Router').disabled = True
-logging.getLogger('LiteLLM Proxy').disabled = True
+# logging.getLogger('LiteLLM').disabled = True
+# logging.getLogger('LiteLLM Router').disabled = True
+# logging.getLogger('LiteLLM Proxy').disabled = True
 
 # Exclude loquacious loggers
 LOQUACIOUS_LOGGERS = [

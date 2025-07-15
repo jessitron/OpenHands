@@ -77,33 +77,14 @@ from openhands.storage.settings.file_settings_store import FileSettingsStore
 
 tracer = trace.get_tracer(__name__)
 
-# this doesn't belong here but wcyd
-import logging
+# this doesn't belong here but wcyd - initialize otel logging according to https://docs.honeycomb.io/send-data/logs/opentelemetry/sdk/python/
+# from opentelemetry._logs import set_logger_provider
+# from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+# from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+# from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+# from opentelemetry.sdk.resources import Resource
 
-from opentelemetry._logs import set_logger_provider
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
-from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.sdk.resources import Resource
-
-# Create and set the logger provider
-logger_provider = LoggerProvider()
-set_logger_provider(logger_provider)
-
-# Create the OTLP log exporter that sends logs to configured destination
-exporter = OTLPLogExporter()
-logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
-
-# Attach OTLP handler to root logger
-handler = LoggingHandler(logger_provider=logger_provider)
-logging.getLogger().addHandler(handler)
-
-# You can use logging directly anywhere in your app now
-logging.warning("It begins")
-
-
-
-
+logger.warning("It begins")
 
 async def cleanup_session(
     loop: asyncio.AbstractEventLoop,
@@ -397,12 +378,15 @@ async def main_with_loop(loop: asyncio.AbstractEventLoop) -> None:
 
     # Set log level from command line argument if provided
     if args.log_level and isinstance(args.log_level, str):
+        trace.get_current_span().set_attribute("params.log_level", args.log_level)
         log_level = getattr(logging, str(args.log_level).upper())
+        trace.get_current_span().set_attribute("set.log_level", log_level)
         logger.setLevel(log_level)
     else:
         # Set default log level to WARNING if no LOG_LEVEL environment variable is set
         # (command line argument takes precedence over environment variable)
         env_log_level = os.getenv('LOG_LEVEL')
+        trace.get_current_span().set_attribute("env.log_level", log_level)
         if not env_log_level:
             logger.setLevel(logging.WARNING)
 
@@ -559,8 +543,7 @@ def main():
 
 if __name__ == '__main__':
     with tracer.start_as_current_span("main"):
-        logging.warning("This is inside the main function")
+        logger.warning("This is inside the main function")
         print("Jess was here")
         main()
-    # Ensure the logger is shutdown before exiting so all pending logs are exported
-    logger_provider.shutdown()
+        logger.warning("This is after the main function")
