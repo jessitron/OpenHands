@@ -2,4 +2,4 @@
 
 export OTEL_SERVICE_NAME="openhands-cli"
 
-poetry run opentelemetry-instrument python -m openhands.cli.main
+poetry run opentelemetry-instrument --metrics_exporter none python -m openhands.cli.main

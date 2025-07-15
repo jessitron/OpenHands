@@ -7,6 +7,8 @@ from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import clear
 
+from opentelemetry import trace
+
 import openhands.agenthub  # noqa F401 (we import this to get the agents registered)
 import openhands.cli.suppress_warnings  # noqa: F401
 from openhands.cli.commands import (
@@ -72,6 +74,35 @@ from openhands.memory.condenser.impl.llm_summarizing_condenser import (
 from openhands.microagent.microagent import BaseMicroagent
 from openhands.runtime.base import Runtime
 from openhands.storage.settings.file_settings_store import FileSettingsStore
+
+tracer = trace.get_tracer(__name__)
+
+# this doesn't belong here but wcyd
+import logging
+
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
+
+# Create and set the logger provider
+logger_provider = LoggerProvider()
+set_logger_provider(logger_provider)
+
+# Create the OTLP log exporter that sends logs to configured destination
+exporter = OTLPLogExporter()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+
+# Attach OTLP handler to root logger
+handler = LoggingHandler(logger_provider=logger_provider)
+logging.getLogger().addHandler(handler)
+
+# You can use logging directly anywhere in your app now
+logging.warning("It begins")
+
+
+
 
 
 async def cleanup_session(
@@ -527,4 +558,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with tracer.start_as_current_span("main"):
+        logging.warning("This is inside the main function")
+        print("Jess was here")
+        main()
+    # Ensure the logger is shutdown before exiting so all pending logs are exported
+    logger_provider.shutdown()
