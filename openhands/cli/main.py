@@ -86,6 +86,7 @@ tracer = trace.get_tracer(__name__)
 
 logger.warning("It begins")
 
+
 async def cleanup_session(
     loop: asyncio.AbstractEventLoop,
     agent: Agent,
@@ -135,25 +136,34 @@ async def run_session(
     exit_reason = ExitReason.INTENTIONAL
 
     sid = generate_sid(config, session_name)
-    is_loaded = asyncio.Event()
-    is_paused = asyncio.Event()  # Event to track agent pause requests
-    always_confirm_mode = False  # Flag to enable always confirm mode
+    with tracer.start_as_current_span("run_session") as span:
+        span.set_attribute("app.session_id", sid)
+        span.set_attribute("app.session_name", session_name)
+        span.set_attribute("app.current_dir", current_dir)
+        span.set_attribute("app.task_content", task_content)
+        span.set_attribute("app.conversation_instructions", conversation_instructions)
+        is_loaded = asyncio.Event()
+        is_paused = asyncio.Event()  # Event to track agent pause requests
+        always_confirm_mode = False  # Flag to enable always confirm mode
 
-    # Show runtime initialization message
-    display_runtime_initialization_message(config.runtime)
+        # Show runtime initialization message
+        display_runtime_initialization_message(config.runtime)
 
-    # Show Initialization loader
-    loop.run_in_executor(
-        None, display_initialization_animation, 'Initializing...', is_loaded
-    )
+        # Show Initialization loader
+        with tracer.start_as_current_span("display_initialization_animation") as span:
+            loop.run_in_executor(
+                None, display_initialization_animation, 'Initializing...', is_loaded
+            )
 
-    agent = create_agent(config)
-    runtime = create_runtime(
-        config,
-        sid=sid,
-        headless_mode=True,
-        agent=agent,
-    )
+        with tracer.start_as_current_span("create_agent") as span:
+            agent = create_agent(config)
+        with tracer.start_as_current_span("create_runtime") as span:
+            runtime = create_runtime(
+                config,
+                sid=sid,
+                headless_mode=True,
+                agent=agent,
+            )
 
     def stream_to_console(output: str) -> None:
         # Instead of printing to stdout, pass the string to the TUI module
@@ -476,24 +486,28 @@ async def main_with_loop(loop: asyncio.AbstractEventLoop) -> None:
         # User rejected, exit application
         return
 
-    # Read task from file, CLI args, or stdin
-    if args.file:
-        # For CLI usage, we want to enhance the file content with a prompt
-        # that instructs the agent to read and understand the file first
-        with open(args.file, 'r', encoding='utf-8') as file:
-            file_content = file.read()
+    with tracer.start_as_current_span("read_task") as span:
+        # Read task from file, CLI args, or stdin
+        if args.file:
+            trace.get_current_span().set_attribute("params.file", args.file)
+            # For CLI usage, we want to enhance the file content with a prompt
+            # that instructs the agent to read and understand the file first
+            with open(args.file, 'r', encoding='utf-8') as file:
+                file_content = file.read()
+                trace.get_current_span().set_attribute("app.file_content", file_content)
 
-        # Create a prompt that instructs the agent to read and understand the file first
-        task_str = f"""The user has tagged a file '{args.file}'.
-Please read and understand the following file content first:
+            # Create a prompt that instructs the agent to read and understand the file first
+            task_str = f"""The user has tagged a file '{args.file}'.
+    Please read and understand the following file content first:
 
-```
-{file_content}
-```
+    ```
+    {file_content}
+    ```
 
-After reviewing the file, please ask the user what they would like to do with it."""
-    else:
-        task_str = read_task(args, config.cli_multiline_input)
+    After reviewing the file, please ask the user what they would like to do with it."""
+        else:
+            task_str = read_task(args, config.cli_multiline_input)
+        trace.get_current_span().set_attribute("app.task", task_str)
 
     # Run the first session
     new_session_requested = await run_session(

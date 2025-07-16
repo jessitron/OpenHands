@@ -1,9 +1,12 @@
 import asyncio
 from pathlib import Path
 
+from opentelemetry import trace
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.shortcuts import clear, print_container
 from prompt_toolkit.widgets import Frame, TextArea
+
+tracer = trace.get_tracer(__name__)
 
 from openhands.cli.settings import (
     display_settings,
@@ -285,45 +288,46 @@ async def init_repository(config: OpenHandsConfig, current_dir: str) -> bool:
 def check_folder_security_agreement(config: OpenHandsConfig, current_dir: str) -> bool:
     # Directories trusted by user for the CLI to use as workspace
     # Config from ~/.openhands/config.toml overrides the app config
+    with tracer.start_as_current_span("check_folder_security_agreement") as span:
 
-    app_config_trusted_dirs = config.sandbox.trusted_dirs
-    local_config_trusted_dirs = get_local_config_trusted_dirs()
+        app_config_trusted_dirs = config.sandbox.trusted_dirs
+        local_config_trusted_dirs = get_local_config_trusted_dirs()
 
-    trusted_dirs = local_config_trusted_dirs
-    if not local_config_trusted_dirs:
-        trusted_dirs = app_config_trusted_dirs
+        trusted_dirs = local_config_trusted_dirs
+        if not local_config_trusted_dirs:
+            trusted_dirs = app_config_trusted_dirs
 
-    is_trusted = current_dir in trusted_dirs
+        is_trusted = current_dir in trusted_dirs
 
-    if not is_trusted:
-        security_frame = Frame(
-            TextArea(
-                text=(
-                    f' Do you trust the files in this folder?\n\n'
-                    f'   {current_dir}\n\n'
-                    ' OpenHands may read and execute files in this folder with your permission.'
+        if not is_trusted:
+            security_frame = Frame(
+                TextArea(
+                    text=(
+                        f' Do you trust the files in this folder?\n\n'
+                        f'   {current_dir}\n\n'
+                        ' OpenHands may read and execute files in this folder with your permission.'
+                    ),
+                    style=COLOR_GREY,
+                    read_only=True,
+                    wrap_lines=True,
                 ),
-                style=COLOR_GREY,
-                read_only=True,
-                wrap_lines=True,
-            ),
-            style=f'fg:{COLOR_GREY}',
-        )
-
-        clear()
-        print_container(security_frame)
-        print_formatted_text('')
-
-        confirm = (
-            cli_confirm(
-                config, 'Do you wish to continue?', ['Yes, proceed', 'No, exit']
+                style=f'fg:{COLOR_GREY}',
             )
-            == 0
-        )
 
-        if confirm:
-            add_local_config_trusted_dir(current_dir)
+            clear()
+            print_container(security_frame)
+            print_formatted_text('')
 
-        return confirm
+            confirm = (
+                cli_confirm(
+                    config, 'Do you wish to continue?', ['Yes, proceed', 'No, exit']
+                )
+                == 0
+            )
 
-    return True
+            if confirm:
+                add_local_config_trusted_dir(current_dir)
+
+            return confirm
+
+        return True

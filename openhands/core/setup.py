@@ -3,6 +3,7 @@ import os
 import uuid
 from typing import Callable
 
+from opentelemetry import trace
 from pydantic import SecretStr
 
 import openhands.agenthub  # noqa F401 (we import this to get the agents registered)
@@ -26,6 +27,8 @@ from openhands.storage import get_file_store
 from openhands.storage.data_models.user_secrets import UserSecrets
 from openhands.utils.async_utils import GENERAL_TIMEOUT, call_async_from_sync
 
+tracer = trace.get_tracer(__name__)
+
 
 def create_runtime(
     config: OpenHandsConfig,
@@ -46,43 +49,51 @@ def create_runtime(
     Returns:
         The created Runtime instance (not yet connected or initialized).
     """
-    # if sid is provided on the command line, use it as the name of the event stream
-    # otherwise generate it on the basis of the configured jwt_secret
-    # we can do this better, this is just so that the sid is retrieved when we want to restore the session
-    session_id = sid or generate_sid(config)
+    with tracer.start_as_current_span("create_runtime") as span:
+        # if sid is provided on the command line, use it as the name of the event stream
+        # otherwise generate it on the basis of the configured jwt_secret
+        # we can do this better, this is just so that the sid is retrieved when we want to restore the session
+        session_id = sid or generate_sid(config)
+        span.set_attribute("app.session_id", session_id)
 
-    # set up the event stream
-    file_store = get_file_store(config.file_store, config.file_store_path)
-    event_stream = EventStream(session_id, file_store)
+        # set up the event stream
+        file_store = get_file_store(config.file_store, config.file_store_path)
+        span.set_attribute("app.file_store", file_store)
+        event_stream = EventStream(session_id, file_store)
 
-    # set up the security analyzer
-    if config.security.security_analyzer:
-        options.SecurityAnalyzers.get(
-            config.security.security_analyzer, SecurityAnalyzer
-        )(event_stream)
+        # set up the security analyzer
+        if config.security.security_analyzer:
+            options.SecurityAnalyzers.get(
+                config.security.security_analyzer, SecurityAnalyzer
+            )(event_stream)
 
-    # agent class
-    if agent:
-        agent_cls = type(agent)
-    else:
-        agent_cls = Agent.get_cls(config.default_agent)
+        # agent class
+        if agent:
+            agent_cls = type(agent)
+        else:
+            agent_cls = Agent.get_cls(config.default_agent)
+        span.set_attribute("app.agent_cls", agent_cls.__name__)
 
-    # runtime and tools
-    runtime_cls = get_runtime_cls(config.runtime)
-    logger.debug(f'Initializing runtime: {runtime_cls.__name__}')
-    runtime: Runtime = runtime_cls(
-        config=config,
-        event_stream=event_stream,
-        sid=session_id,
-        plugins=agent_cls.sandbox_plugins,
-        headless_mode=headless_mode,
-    )
+        # runtime and tools
+        runtime_cls = get_runtime_cls(config.runtime)
+        logger.debug(f'Initializing runtime: {runtime_cls.__name__}')
+        span.set_attribute("app.runtime_cls", runtime_cls.__name__)
+        runtime: Runtime = runtime_cls(
+            config=config,
+            event_stream=event_stream,
+            sid=session_id,
+            plugins=agent_cls.sandbox_plugins,
+            headless_mode=headless_mode,
+        )
 
-    logger.debug(
-        f'Runtime created with plugins: {[plugin.name for plugin in runtime.plugins]}'
-    )
+        logger.debug(
+            f'Runtime created with plugins: {[plugin.name for plugin in runtime.plugins]}'
+        )
+        span.set_attribute(
+            "app.runtime_plugins", [plugin.name for plugin in runtime.plugins]
+        )
 
-    return runtime
+        return runtime
 
 
 def initialize_repository_for_runtime(
