@@ -157,16 +157,16 @@ async def run_session(
 
         with tracer.start_as_current_span("create_agent") as span:
             agent = create_agent(config)
-        with tracer.start_as_current_span("create_runtime") as span:
-            runtime = create_runtime(
-                config,
-                sid=sid,
-                headless_mode=True,
-                agent=agent,
-            )
+        runtime = create_runtime(
+            config,
+            sid=sid,
+            headless_mode=True,
+            agent=agent,
+        )
 
     def stream_to_console(output: str) -> None:
         # Instead of printing to stdout, pass the string to the TUI module
+        span.add_event("stream_to_console", {"app.console_output": output})
         update_streaming_output(output)
 
     runtime.subscribe_to_shell_stream(stream_to_console)

@@ -4,6 +4,7 @@ import uuid
 from typing import Callable
 
 from opentelemetry import trace
+from opentelemetry.trace.status import StatusCode
 from pydantic import SecretStr
 
 import openhands.agenthub  # noqa F401 (we import this to get the agents registered)
@@ -209,28 +210,32 @@ def create_controller(
 ) -> tuple[AgentController, State | None]:
     event_stream = runtime.event_stream
     initial_state = None
-    try:
-        logger.debug(
-            f'Trying to restore agent state from session {event_stream.sid} if available'
-        )
-        initial_state = State.restore_from_session(
-            event_stream.sid, event_stream.file_store
-        )
-    except Exception as e:
-        logger.debug(f'Cannot restore agent state: {e}')
+    with tracer.start_as_current_span("create_controller") as span:
+        try:
+            logger.debug(
+                f'Trying to restore agent state from session {event_stream.sid} if available'
+            )
+            span.set_attribute("app.session_id", event_stream.sid)
+            initial_state = State.restore_from_session(
+                event_stream.sid, event_stream.file_store
+            )
+        except Exception as e:
+            logger.debug(f'Cannot restore agent state: {e}')
+            span.record_exception(e)
+            span.set_status(StatusCode.ERROR)
 
-    controller = AgentController(
-        agent=agent,
-        iteration_delta=config.max_iterations,
-        budget_per_task_delta=config.max_budget_per_task,
-        agent_to_llm_config=config.get_agent_to_llm_config_map(),
-        event_stream=event_stream,
-        initial_state=initial_state,
-        headless_mode=headless_mode,
-        confirmation_mode=config.security.confirmation_mode,
-        replay_events=replay_events,
-    )
-    return (controller, initial_state)
+        controller = AgentController(
+            agent=agent,
+            iteration_delta=config.max_iterations,
+            budget_per_task_delta=config.max_budget_per_task,
+            agent_to_llm_config=config.get_agent_to_llm_config_map(),
+            event_stream=event_stream,
+            initial_state=initial_state,
+            headless_mode=headless_mode,
+            confirmation_mode=config.security.confirmation_mode,
+            replay_events=replay_events,
+        )
+        return (controller, initial_state)
 
 
 def generate_sid(config: OpenHandsConfig, session_name: str | None = None) -> str:
