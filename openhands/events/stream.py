@@ -19,6 +19,8 @@ from openhands.storage.locations import (
 from openhands.utils.async_utils import call_sync_from_async
 from openhands.utils.shutdown_listener import should_continue
 
+from opentelemetry import trace
+
 
 class EventStreamSubscriber(str, Enum):
     AGENT_CONTROLLER = 'agent_controller'
@@ -162,6 +164,13 @@ class EventStream(EventStore):
         self._clean_up_subscriber(subscriber_id, callback_id)
 
     def add_event(self, event: Event, source: EventSource) -> None:
+        trace.get_current_span().add_event(
+            "Event",
+            {
+                "app.event_type": event.__class__.__name__,
+                "app.event_source": source.value,
+            },
+        )
         if event.id != Event.INVALID_ID:
             raise ValueError(
                 f'Event already has an ID:{event.id}. It was probably added back to the EventStream from inside a handler, triggering a loop.'

@@ -137,7 +137,7 @@ async def run_session(
 
     sid = generate_sid(config, session_name)
     with tracer.start_as_current_span("run_session") as span:
-        span.set_attribute("app.session_id", sid)
+        span.set_attribute("app.conversation_id", sid)
         span.set_attribute("app.session_name", session_name)
         span.set_attribute("app.current_dir", current_dir)
         span.set_attribute("app.task_content", task_content)
@@ -557,7 +557,6 @@ def main():
 
 if __name__ == '__main__':
     with tracer.start_as_current_span("main"):
-        logger.warning("This is inside the main function")
         print("Jess was here")
         main()
-        logger.warning("This is after the main function")
+        logger.warning("Exiting")

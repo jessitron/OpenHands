@@ -52,6 +52,10 @@ from openhands.runtime.base import Runtime
 from openhands.runtime.plugins import PluginRequirement
 from openhands.runtime.runtime_status import RuntimeStatus
 
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
 if TYPE_CHECKING:
     from openhands.runtime.utils.windows_bash import WindowsPowershellSession
 
@@ -338,100 +342,105 @@ class CLIRuntime(Runtime):
         output_lines = []
         timed_out = False
         start_time = time.monotonic()
+        with tracer.start_as_current_span('execute_shell_command') as span:
+            span.set_attribute('app.command', command)
+            span.set_attribute('app.timeout', timeout)
 
-        # Use shell=True to run complex bash commands
-        process = subprocess.Popen(
-            ['bash', '-c', command],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,  # Explicitly line-buffered for text mode
-            universal_newlines=True,
-            start_new_session=True,
-        )
-        logger.debug(
-            f'[_execute_shell_command] PID of bash -c: {process.pid} for command: "{command}"'
-        )
-
-        exit_code = None
-
-        try:
-            if process.stdout:
-                while process.poll() is None:
-                    if (
-                        timeout is not None
-                        and (time.monotonic() - start_time) > timeout
-                    ):
-                        logger.debug(
-                            f'Command "{command}" timed out after {timeout:.1f} seconds. Terminating.'
-                        )
-                        # Attempt to terminate the process group (SIGTERM)
-                        self._safe_terminate_process(
-                            process, signal_to_send=signal.SIGTERM
-                        )
-                        timed_out = True
-                        break
-
-                    ready_to_read, _, _ = select.select([process.stdout], [], [], 0.1)
-
-                    if ready_to_read:
-                        line = process.stdout.readline()
-                        if line:
-                            logger.debug(f'LINE: {line}')
-                            output_lines.append(line)
-                            if self._shell_stream_callback:
-                                self._shell_stream_callback(line)
-
-            # Attempt to read any remaining data from stdout
-            if process.stdout and not process.stdout.closed:
-                try:
-                    while line:
-                        line = process.stdout.readline()
-                        if line:
-                            logger.debug(f'LINE: {line}')
-                            output_lines.append(line)
-                            if self._shell_stream_callback:
-                                self._shell_stream_callback(line)
-                except Exception as e:
-                    logger.warning(
-                        f'Error reading directly from stdout after loop for "{command}": {e}'
-                    )
-
-            exit_code = process.returncode
-
-            # If timeout occurred, ensure exit_code reflects this for the observation.
-            if timed_out:
-                exit_code = -1
-
-        except Exception as e:
-            logger.error(
-                f'Outer exception in _execute_shell_command for "{command}": {e}'
+            # Use shell=True to run complex bash commands
+            process = subprocess.Popen(
+                ['bash', '-c', command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,  # Explicitly line-buffered for text mode
+                universal_newlines=True,
+                start_new_session=True,
             )
-            if process and process.poll() is None:
-                self._safe_terminate_process(process, signal_to_send=signal.SIGKILL)
+            logger.debug(
+                f'[_execute_shell_command] PID of bash -c: {process.pid} for command: "{command}"'
+            )
+
+            exit_code = None
+
+            try:
+                if process.stdout:
+                    while process.poll() is None:
+                        if (
+                            timeout is not None
+                            and (time.monotonic() - start_time) > timeout
+                        ):
+                            logger.debug(
+                                f'Command "{command}" timed out after {timeout:.1f} seconds. Terminating.'
+                            )
+                            # Attempt to terminate the process group (SIGTERM)
+                            self._safe_terminate_process(
+                                process, signal_to_send=signal.SIGTERM
+                            )
+                            timed_out = True
+                            break
+
+                        ready_to_read, _, _ = select.select(
+                            [process.stdout], [], [], 0.1
+                        )
+
+                        if ready_to_read:
+                            line = process.stdout.readline()
+                            if line:
+                                logger.debug(f'LINE: {line}')
+                                output_lines.append(line)
+                                if self._shell_stream_callback:
+                                    self._shell_stream_callback(line)
+
+                # Attempt to read any remaining data from stdout
+                if process.stdout and not process.stdout.closed:
+                    try:
+                        while line:
+                            line = process.stdout.readline()
+                            if line:
+                                logger.debug(f'LINE: {line}')
+                                output_lines.append(line)
+                                if self._shell_stream_callback:
+                                    self._shell_stream_callback(line)
+                    except Exception as e:
+                        logger.warning(
+                            f'Error reading directly from stdout after loop for "{command}": {e}'
+                        )
+
+                exit_code = process.returncode
+
+                # If timeout occurred, ensure exit_code reflects this for the observation.
+                if timed_out:
+                    exit_code = -1
+
+            except Exception as e:
+                logger.error(
+                    f'Outer exception in _execute_shell_command for "{command}": {e}'
+                )
+                if process and process.poll() is None:
+                    self._safe_terminate_process(process, signal_to_send=signal.SIGKILL)
+                return CmdOutputObservation(
+                    command=command,
+                    content=''.join(output_lines) + f'\nError during execution: {e}',
+                    exit_code=-1,
+                )
+
+            complete_output = ''.join(output_lines)
+            logger.debug(
+                f'[_execute_shell_command] Complete output for "{command}" (len: {len(complete_output)}): {complete_output!r}'
+            )
+            obs_metadata = {'working_dir': self._workspace_path}
+            if timed_out:
+                obs_metadata['suffix'] = (
+                    f'[The command timed out after {timeout:.1f} seconds.]'
+                )
+                # exit_code = -1 # This is already set if timed_out is True
+
             return CmdOutputObservation(
                 command=command,
-                content=''.join(output_lines) + f'\nError during execution: {e}',
-                exit_code=-1,
+                content=complete_output,
+                exit_code=exit_code,
+                metadata=obs_metadata,
             )
-
-        complete_output = ''.join(output_lines)
-        logger.debug(
-            f'[_execute_shell_command] Complete output for "{command}" (len: {len(complete_output)}): {complete_output!r}'
-        )
-        obs_metadata = {'working_dir': self._workspace_path}
-        if timed_out:
-            obs_metadata['suffix'] = (
-                f'[The command timed out after {timeout:.1f} seconds.]'
-            )
-            # exit_code = -1 # This is already set if timed_out is True
-
-        return CmdOutputObservation(
-            command=command,
-            content=complete_output,
-            exit_code=exit_code,
-            metadata=obs_metadata,
-        )
 
     def run(self, action: CmdRunAction) -> Observation:
         """Run a command using subprocess."""
@@ -628,28 +637,38 @@ class CLIRuntime(Runtime):
             tuple: A tuple containing the output string and a tuple of old and new file content
         """
         result: ToolResult | None = None
-        try:
-            result = self.file_editor(
-                command=command,
-                path=path,
-                file_text=file_text,
-                view_range=view_range,
-                old_str=old_str,
-                new_str=new_str,
-                insert_line=insert_line,
-                enable_linting=enable_linting,
-            )
-        except ToolError as e:
-            result = ToolResult(error=e.message)
+        with tracer.start_as_current_span('execute_file_editor') as span:
+            span.set_attribute('app.command', command)
+            span.set_attribute('app.path', path)
+            span.set_attribute('app.file_text', file_text)
+            span.set_attribute('app.view_range', view_range)
+            span.set_attribute('app.old_str', old_str)
+            span.set_attribute('app.new_str', new_str)
+            span.set_attribute('app.insert_line', insert_line)
+            try:
+                result = self.file_editor(
+                    command=command,
+                    path=path,
+                    file_text=file_text,
+                    view_range=view_range,
+                    old_str=old_str,
+                    new_str=new_str,
+                    insert_line=insert_line,
+                    enable_linting=enable_linting,
+                )
+            except ToolError as e:
+                span.record_exception(e)
+                result = ToolResult(error=e.message)
 
-        if result.error:
-            return f'ERROR:\n{result.error}', (None, None)
+            if result.error:
+                span.set_status(trace.StatusCode.ERROR)
+                return f'ERROR:\n{result.error}', (None, None)
 
-        if not result.output:
-            logger.warning(f'No output from file_editor for {path}')
-            return '', (None, None)
+            if not result.output:
+                logger.warning(f'No output from file_editor for {path}')
+                return '', (None, None)
 
-        return result.output, (result.old_content, result.new_content)
+            return result.output, (result.old_content, result.new_content)
 
     def edit(self, action: FileEditAction) -> Observation:
         """Edit a file using the OHEditor."""

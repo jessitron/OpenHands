@@ -2,7 +2,7 @@
 
 export OTEL_SERVICE_NAME="openhands-cli"
 
-## Log levels
+## Log levels (not case-sensitive)
 # _nameToLevel = {
 #     'CRITICAL': CRITICAL,
 #     'FATAL': FATAL,
@@ -14,4 +14,4 @@ export OTEL_SERVICE_NAME="openhands-cli"
 #     'NOTSET': NOTSET,
 # }
 
-poetry run opentelemetry-instrument --logs_exporter otlp --metrics_exporter none python -m openhands.cli.main --log-level debug
+poetry run opentelemetry-instrument --logs_exporter otlp --metrics_exporter none python -m openhands.cli.main --log-level warn

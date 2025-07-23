@@ -76,6 +76,9 @@ from openhands.events.serialization.event import truncate_content
 from openhands.llm.llm import LLM
 from openhands.llm.metrics import Metrics
 from openhands.storage.files import FileStore
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
 
 # note: RESUME is only available on web GUI
 TRAFFIC_CONTROL_REMINDER = (
@@ -574,6 +577,7 @@ class AgentController:
         self.log(
             'info',
             f'Setting agent({self.agent.name}) state from {self.state.agent_state} to {new_state}',
+            extra={'from_state': self.state.agent_state, 'to_state': new_state},
         )
 
         if new_state == self.state.agent_state:
@@ -809,10 +813,13 @@ class AgentController:
             action = self._replay_manager.step()
         else:
             try:
-                action = self.agent.step(self.state)
-                if action is None:
-                    raise LLMNoActionError('No action was returned')
-                action._source = EventSource.AGENT  # type: ignore [attr-defined]
+                with tracer.start_as_current_span("agent_step") as span:
+                    span.set_attribute("app.agent_state", self.state.agent_state)
+                    action = self.agent.step(self.state)
+                    if action is None:
+                        raise LLMNoActionError('No action was returned')
+                    span.set_attribute("app.action_type", action.__class__.__name__)
+                    action._source = EventSource.AGENT  # type: ignore [attr-defined]
             except (
                 LLMMalformedActionError,
                 LLMNoActionError,
@@ -828,6 +835,7 @@ class AgentController:
                 )
                 return
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as e:
+                span.record_exception(e)
                 # FIXME: this is a hack until a litellm fix is confirmed
                 # Check if this is a nested context window error
                 # We have to rely on string-matching because LiteLLM doesn't consistently

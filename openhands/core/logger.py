@@ -340,7 +340,7 @@ def log_uncaught_exceptions(
 ) -> Any:
     """Logs uncaught exceptions along with the traceback.
 
-    Args:
+    Args:https://antithesis.com/resources/reliability_glossary/
         ex_cls: The type of the exception.
         ex: The exception instance.
         tb: The traceback object.

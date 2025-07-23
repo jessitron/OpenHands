@@ -395,10 +395,14 @@ class ActionExecutor:
         logger.debug('Bash init commands completed')
 
     async def run_action(self, action) -> Observation:
-        async with self.lock:
-            action_type = action.action
-            observation = await getattr(self, action_type)(action)
-            return observation
+        with tracer.start_as_current_span('run_action') as span:
+            span.set_attribute('app.action', action.action)
+            span.set_attribute('app.action_id', action.id)
+            span.set_attribute('app.action_tostring', str(action))
+            async with self.lock:
+                action_type = action.action
+                observation = await getattr(self, action_type)(action)
+                return observation
 
     async def run(
         self, action: CmdRunAction

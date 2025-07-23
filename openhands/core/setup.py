@@ -220,9 +220,9 @@ def create_controller(
                 event_stream.sid, event_stream.file_store
             )
         except Exception as e:
-            logger.debug(f'Cannot restore agent state: {e}')
+            logger.debug(f'Did not find any state to restore: {e}')
             span.record_exception(e)
-            span.set_status(StatusCode.ERROR)
+            # this is normal; do not mark the span as error
 
         controller = AgentController(
             agent=agent,
