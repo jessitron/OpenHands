@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+
+
 export OTEL_SERVICE_NAME="openhands-cli"
 
 ## Log levels (not case-sensitive)
@@ -13,5 +15,10 @@ export OTEL_SERVICE_NAME="openhands-cli"
 #     'DEBUG': DEBUG,
 #     'NOTSET': NOTSET,
 # }
+
+export SANDBOX_VOLUMES="/workspaces/openhands/simple-web-page:/workspace:rw"
+
+# If you haven't yet:
+# poetry install
 
 poetry run opentelemetry-instrument --logs_exporter otlp --metrics_exporter none python -m openhands.cli.main --log-level warn
