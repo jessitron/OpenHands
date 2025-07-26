@@ -296,9 +296,10 @@ async def modify_llm_settings_basic(
 
         api_key = await get_validated_input(
             session,
-            '(Step 3/3) Enter API Key (CTRL-c to cancel): ',
+            'Enter API Key (CTRL-c to cancel): ',
             error_message='API Key cannot be empty',
         )
+        api_key = api_key.strip()  # Remove any trailing whitespace/newlines
 
     except (
         UserCancelledError,
