@@ -36,6 +36,9 @@ from openhands.mcp import add_mcp_tools_to_agent
 from openhands.memory.memory import Memory
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
 
 
 class FakeUserResponseFunc(Protocol):
@@ -110,14 +113,17 @@ async def run_controller(
             agent=agent,
         )
         # Connect to the runtime
-        call_async_from_sync(runtime.connect)
+        with tracer.start_as_current_span("connect to runtime") as span:
+            call_async_from_sync(runtime.connect)
 
         # Initialize repository if needed
-        if config.sandbox.selected_repo:
-            repo_directory = initialize_repository_for_runtime(
-                runtime,
-                selected_repository=config.sandbox.selected_repo,
-            )
+        with tracer.start_as_current_span("initialize repository") as span:
+            span.set_attribute("app.selected_repo", config.sandbox.selected_repo)
+            if config.sandbox.selected_repo:
+                repo_directory = initialize_repository_for_runtime(
+                    runtime,
+                    selected_repository=config.sandbox.selected_repo,
+                )
 
     event_stream = runtime.event_stream
 
@@ -156,9 +162,9 @@ async def run_controller(
         agent, runtime, config, replay_events=replay_events
     )
 
-    assert isinstance(initial_user_action, Action), (
-        f'initial user actions must be an Action, got {type(initial_user_action)}'
-    )
+    assert isinstance(
+        initial_user_action, Action
+    ), f'initial user actions must be an Action, got {type(initial_user_action)}'
     logger.debug(
         f'Agent Controller Initialized: Running agent {agent.name}, model '
         f'{agent.llm.config.model}, with actions: {initial_user_action}'
@@ -274,38 +280,53 @@ def load_replay_log(trajectory_path: str) -> tuple[list[Event] | None, Action]:
         raise ValueError(f'Invalid JSON format in {trajectory_path}: {e}')
 
 
-if __name__ == '__main__':
-    args = parse_arguments()
-
-    config: OpenHandsConfig = setup_config_from_args(args)
-
-    # Read task from file, CLI args, or stdin
-    task_str = read_task(args, config.cli_multiline_input)
-
-    initial_user_action: Action = NullAction()
-    if config.replay_trajectory_path:
-        if task_str:
-            raise ValueError(
-                'User-specified task is not supported under trajectory replay mode'
-            )
-    else:
-        if not task_str:
-            raise ValueError('No task provided. Please specify a task through -t, -f.')
-
-        # Create actual initial user action
-        initial_user_action = MessageAction(content=task_str)
-
-    # Set session name
-    session_name = args.name
-    sid = generate_sid(config, session_name)
-
-    asyncio.run(
-        run_controller(
-            config=config,
-            initial_user_action=initial_user_action,
-            sid=sid,
-            fake_user_response_fn=None
-            if args.no_auto_continue
-            else auto_continue_response,
-        )
+def print_link_to_current_trace() -> None:
+    current_span = trace.get_current_span()
+    trace_id = current_span.get_span_context().trace_id
+    print(
+        f"Link to current trace: https://ui.honeycomb.io/modernity/environments/banana?trace_id={trace_id}"
     )
+
+
+if __name__ == '__main__':
+    with tracer.start_as_current_span("main") as span:
+        print_link_to_current_trace()
+        args = parse_arguments()
+
+        config: OpenHandsConfig = setup_config_from_args(args)
+
+        # Read task from file, CLI args, or stdin
+        task_str = read_task(args, config.cli_multiline_input)
+        span.set_attribute("app.task", task_str)
+
+        initial_user_action: Action = NullAction()
+        if config.replay_trajectory_path:
+            if task_str:
+                raise ValueError(
+                    'User-specified task is not supported under trajectory replay mode'
+                )
+        else:
+            if not task_str:
+                raise ValueError(
+                    'No task provided. Please specify a task through -t, -f.'
+                )
+
+            # Create actual initial user action
+            initial_user_action = MessageAction(content=task_str)
+
+        # Set session name
+        session_name = args.name
+        sid = generate_sid(config, session_name)
+        span.set_attribute("app.conversation_id", sid)
+        span.set_attribute("app.session_name", session_name)
+
+        asyncio.run(
+            run_controller(
+                config=config,
+                initial_user_action=initial_user_action,
+                sid=sid,
+                fake_user_response_fn=(
+                    None if args.no_auto_continue else auto_continue_response
+                ),
+            )
+        )

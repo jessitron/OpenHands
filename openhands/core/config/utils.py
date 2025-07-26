@@ -35,6 +35,9 @@ from openhands.core.config.security_config import SecurityConfig
 from openhands.storage import get_file_store
 from openhands.storage.files import FileStore
 from openhands.utils.import_utils import get_impl
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
 
 JWT_SECRET = '.jwt_secret'
 load_dotenv()
@@ -137,6 +140,8 @@ def load_from_toml(cfg: OpenHandsConfig, toml_file: str = 'config.toml') -> None
     try:
         with open(toml_file, 'r', encoding='utf-8') as toml_contents:
             toml_config = toml.load(toml_contents)
+            trace.get_current_span().set_attribute("params.config_file", toml_file)
+            trace.get_current_span().set_attribute("params.config_file_contents", str(toml_config))
     except FileNotFoundError:
         return
     except toml.TomlDecodeError as e:
@@ -829,34 +834,36 @@ def setup_config_from_args(args: argparse.Namespace) -> OpenHandsConfig:
 
     Common setup used by both CLI and main.py entry points.
     """
-    # Load base config from toml and env vars
-    config = load_openhands_config(config_file=args.config_file)
-    print("Jess is here again")
-    logging.info("Here I am, in the setup config from args function")
+    with tracer.start_as_current_span("setup_config") as span:
+        # Load base config from toml and env vars
+        config = load_openhands_config(config_file=args.config_file)
+        print("Jess is here again")
+        logging.info("Here I am, in the setup config from args function")
 
-    # Override with command line arguments if provided
-    if args.llm_config:
-        # if we didn't already load it, get it from the toml file
-        if args.llm_config not in config.llms:
-            llm_config = get_llm_config_arg(args.llm_config)
-        else:
-            llm_config = config.llms[args.llm_config]
-        if llm_config is None:
-            raise ValueError(f'Invalid toml file, cannot read {args.llm_config}')
-        config.set_llm_config(llm_config)
+        # Override with command line arguments if provided
+        if args.llm_config:
+            # if we didn't already load it, get it from the toml file
+            if args.llm_config not in config.llms:
+                llm_config = get_llm_config_arg(args.llm_config)
+            else:
+                llm_config = config.llms[args.llm_config]
+            if llm_config is None:
+                raise ValueError(f'Invalid toml file, cannot read {args.llm_config}')
+            config.set_llm_config(llm_config)
+        trace.get_current_span().set_attribute("params.llm_config", str(config.get_llm_config()))
 
-    # Override default agent if provided
-    if args.agent_cls:
-        config.default_agent = args.agent_cls
+        # Override default agent if provided
+        if args.agent_cls:
+            config.default_agent = args.agent_cls
 
-    # Set max iterations and max budget per task if provided, otherwise fall back to config values
-    if args.max_iterations is not None:
-        config.max_iterations = args.max_iterations
-    if args.max_budget_per_task is not None:
-        config.max_budget_per_task = args.max_budget_per_task
+        # Set max iterations and max budget per task if provided, otherwise fall back to config values
+        if args.max_iterations is not None:
+            config.max_iterations = args.max_iterations
+        if args.max_budget_per_task is not None:
+            config.max_budget_per_task = args.max_budget_per_task
 
-    # Read selected repository in config for use by CLI and main.py
-    if args.selected_repo is not None:
-        config.sandbox.selected_repo = args.selected_repo
+        # Read selected repository in config for use by CLI and main.py
+        if args.selected_repo is not None:
+            config.sandbox.selected_repo = args.selected_repo
 
-    return config
+        return config

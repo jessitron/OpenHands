@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -z "$HONEYCOMB_API_KEY" ]; then
+  echo "HONEYCOMB_API_KEY is not set. Source .be, Jess"
+  exit 1
+fi
+
+export OTEL_SERVICE_NAME="openhands-headless"
+
+poetry run opentelemetry-instrument python -m openhands.core.main -t "write a bash script that prints hi" --selected-repo jessitron/cynditaylor-dot-com

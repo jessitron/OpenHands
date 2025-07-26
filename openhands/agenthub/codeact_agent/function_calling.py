@@ -76,8 +76,12 @@ def response_to_actions(
         for i, tool_call in enumerate(assistant_msg.tool_calls):
             with tracer.start_as_current_span("function_calling") as span:
                 span.set_attribute("app.tool_call", str(tool_call))
-                span.set_attribute("app.tool_call.function_name", tool_call.function.name)
-                span.set_attribute("app.tool_call.arguments", tool_call.function.arguments)
+                span.set_attribute(
+                    "app.tool_call.function_name", tool_call.function.name
+                )
+                span.set_attribute(
+                    "app.tool_call.arguments", tool_call.function.arguments
+                )
                 action: Action
                 logger.debug(f'Tool call in function_calling.py: {tool_call}')
                 try:
