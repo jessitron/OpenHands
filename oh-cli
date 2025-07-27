@@ -4,7 +4,16 @@
 
 export OTEL_SERVICE_NAME="openhands-cli"
 
-## Log levels (not case-sensitive)
+export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_LOGS_EXPORTER="otlp"
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://host.docker.internal:4318" # local collector
+export OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+
+export OTEL_DEBUG=true
+export OTEL_LOG_LEVEL=info
+
+## Log levels (not case-sensitive) for --log-level
 # _nameToLevel = {
 #     'CRITICAL': CRITICAL,
 #     'FATAL': FATAL,
@@ -16,7 +25,7 @@ export OTEL_SERVICE_NAME="openhands-cli"
 #     'NOTSET': NOTSET,
 # }
 
-export SANDBOX_VOLUMES="/workspaces/openhands/simple-web-page:/workspace:rw"
+export SANDBOX_VOLUMES="/workspaces/simple-web-page:/workspace:rw"
 
 # If you haven't yet:
 # poetry install
