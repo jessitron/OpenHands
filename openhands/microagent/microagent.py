@@ -13,6 +13,10 @@ from openhands.core.exceptions import (
 from openhands.core.logger import openhands_logger as logger
 from openhands.microagent.types import InputMetadata, MicroagentMetadata, MicroagentType
 
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
+
 
 class BaseMicroagent(BaseModel):
     """Base class for all microagents."""
@@ -175,6 +179,24 @@ class KnowledgeMicroagent(BaseMicroagent):
         message = message.lower()
         for trigger in self.triggers:
             if trigger.lower() in message:
+                # Add telemetry when microagent is triggered
+                current_span = trace.get_current_span()
+                current_span.add_event(
+                    "microagent triggered",
+                    {
+                        "microagent.name": self.name,
+                        "microagent.type": self.type.value,
+                        "microagent.trigger": trigger,
+                        "microagent.source": self.source,
+                    },
+                )
+                # Also set span attributes for easier querying
+                current_span.set_attributes({
+                    "microagent.triggered": True,
+                    "microagent.name": self.name,
+                    "microagent.trigger": trigger,
+                })
+                logger.info(f"Microagent '{self.name}' triggered by '{trigger}'")
                 return trigger
 
         return None
@@ -270,40 +292,44 @@ def load_microagents_from_dir(
     """
     if isinstance(microagent_dir, str):
         microagent_dir = Path(microagent_dir)
+    with tracer.start_as_current_span("load_microagents_from_dir") as span:
+        span.set_attribute("app.microagent.directory", str(microagent_dir))
 
-    repo_agents = {}
-    knowledge_agents = {}
+        repo_agents = {}
+        knowledge_agents = {}
 
-    # Load all agents from microagents directory
-    logger.debug(f'Loading agents from {microagent_dir}')
-    if microagent_dir.exists():
-        # Collect .cursorrules file from repo root and .md files from microagents dir
-        cursorrules_files = []
-        if (microagent_dir.parent.parent / '.cursorrules').exists():
-            cursorrules_files = [microagent_dir.parent.parent / '.cursorrules']
+        # Load all agents from microagents directory
+        logger.debug(f'Loading agents from {microagent_dir}')
+        if microagent_dir.exists():
+            # Collect .cursorrules file from repo root and .md files from microagents dir
+            cursorrules_files = []
+            if (microagent_dir.parent.parent / '.cursorrules').exists():
+                cursorrules_files = [microagent_dir.parent.parent / '.cursorrules']
 
-        md_files = [f for f in microagent_dir.rglob('*.md') if f.name != 'README.md']
+            md_files = [f for f in microagent_dir.rglob('*.md') if f.name != 'README.md']
 
-        # Process all files in one loop
-        for file in chain(cursorrules_files, md_files):
-            try:
-                agent = BaseMicroagent.load(file, microagent_dir)
-                if isinstance(agent, RepoMicroagent):
-                    repo_agents[agent.name] = agent
-                elif isinstance(agent, KnowledgeMicroagent):
-                    # Both KnowledgeMicroagent and TaskMicroagent go into knowledge_agents
-                    knowledge_agents[agent.name] = agent
-            except MicroagentValidationError as e:
-                # For validation errors, include the original exception
-                error_msg = f'Error loading microagent from {file}: {str(e)}'
-                raise MicroagentValidationError(error_msg) from e
-            except Exception as e:
-                # For other errors, wrap in a ValueError with detailed message
-                error_msg = f'Error loading microagent from {file}: {str(e)}'
-                raise ValueError(error_msg) from e
+            # Process all files in one loop
+            for file in chain(cursorrules_files, md_files):
+                try:
+                    agent = BaseMicroagent.load(file, microagent_dir)
+                    if isinstance(agent, RepoMicroagent):
+                        repo_agents[agent.name] = agent
+                    elif isinstance(agent, KnowledgeMicroagent):
+                        # Both KnowledgeMicroagent and TaskMicroagent go into knowledge_agents
+                        knowledge_agents[agent.name] = agent
+                except MicroagentValidationError as e:
+                    # For validation errors, include the original exception
+                    error_msg = f'Error loading microagent from {file}: {str(e)}'
+                    raise MicroagentValidationError(error_msg) from e
+                except Exception as e:
+                    # For other errors, wrap in a ValueError with detailed message
+                    error_msg = f'Error loading microagent from {file}: {str(e)}'
+                    raise ValueError(error_msg) from e
 
-    logger.debug(
-        f'Loaded {len(repo_agents) + len(knowledge_agents)} microagents: '
-        f'{[*repo_agents.keys(), *knowledge_agents.keys()]}'
-    )
-    return repo_agents, knowledge_agents
+        logger.debug(
+            f'Loaded {len(repo_agents) + len(knowledge_agents)} microagents: '
+            f'{[*repo_agents.keys(), *knowledge_agents.keys()]}'
+        )
+        span.set_attribute("app.microagent.count", len(repo_agents) + len(knowledge_agents))
+        span.set_attribute("app.microagent.names", str([*repo_agents.keys(), *knowledge_agents.keys()]))
+        return repo_agents, knowledge_agents

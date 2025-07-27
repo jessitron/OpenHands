@@ -285,27 +285,29 @@ async def run_session(
         )
 
     # when memory is created, it will load the microagents from the selected repository
-    memory = create_memory(
-        runtime=runtime,
-        event_stream=event_stream,
-        sid=sid,
-        selected_repository=config.sandbox.selected_repo,
-        repo_directory=repo_directory,
-        conversation_instructions=conversation_instructions,
-    )
-
-    # Add MCP tools to the agent
-    if agent.config.enable_mcp:
-        # Add OpenHands' MCP server by default
-        _, openhands_mcp_stdio_servers = (
-            OpenHandsMCPConfigImpl.create_default_mcp_server_config(
-                config.mcp_host, config, None
-            )
+    with tracer.start_as_current_span("create_memory") as span:
+        memory = create_memory(
+            runtime=runtime,
+            event_stream=event_stream,
+            sid=sid,
+            selected_repository=config.sandbox.selected_repo,
+            repo_directory=repo_directory,
+            conversation_instructions=conversation_instructions,
         )
 
-        runtime.config.mcp.stdio_servers.extend(openhands_mcp_stdio_servers)
+    # Add MCP tools to the agent
+    span.set_attribute("app.enable_mcp", agent.config.enable_mcp)
+    if agent.config.enable_mcp:
+        # Add OpenHands' MCP server by default
+        with tracer.start_as_current_span("add_openhands_mcp_server") as span:
+            _, openhands_mcp_stdio_servers = (
+                OpenHandsMCPConfigImpl.create_default_mcp_server_config(
+                    config.mcp_host, config, None
+                )
+            )
+            runtime.config.mcp.stdio_servers.extend(openhands_mcp_stdio_servers)
 
-        await add_mcp_tools_to_agent(agent, runtime, memory)
+            await add_mcp_tools_to_agent(agent, runtime, memory)
 
     # Clear loading animation
     is_loaded.set()

@@ -17,6 +17,9 @@ from openhands.events.observation.observation import Observation
 from openhands.mcp.client import MCPClient
 from openhands.memory.memory import Memory
 from openhands.runtime.base import Runtime
+from opentelemetry import trace
+
+tracer = trace.get_tracer(__name__)
 
 
 def convert_mcp_clients_to_tools(mcp_clients: list[MCPClient] | None) -> list[dict]:
@@ -195,6 +198,7 @@ async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memo
     import sys
 
     # Skip MCP tools on Windows
+    trace.get_current_span().set_attribute("sys.platform", sys.platform)
     if sys.platform == 'win32':
         logger.info('MCP functionality is disabled on Windows, skipping MCP tools')
         agent.set_mcp_tools([])
@@ -223,9 +227,11 @@ async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memo
 
     # Add the runtime as another MCP server
     updated_mcp_config = runtime.get_mcp_config(extra_stdio_servers)
-
+ 
     # Fetch the MCP tools
-    mcp_tools = await fetch_mcp_tools_from_config(updated_mcp_config)
+    with tracer.start_as_current_span("fetch_mcp_tools_from_config") as span:
+        span.set_attribute("app.mcp_config", updated_mcp_config.model_dump(mode='json'))
+        mcp_tools = await fetch_mcp_tools_from_config(updated_mcp_config)
 
     logger.info(
         f'Loaded {len(mcp_tools)} MCP tools: {[tool["function"]["name"] for tool in mcp_tools]}'

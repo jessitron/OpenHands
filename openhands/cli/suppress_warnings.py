@@ -42,6 +42,21 @@ def suppress_cli_warnings():
         category=UserWarning,
     )
 
+    # Suppress asyncio RuntimeWarning about coroutines that were never awaited
+    # This commonly occurs with Buffer._create_completer_coroutine and similar async operations
+    warnings.filterwarnings(
+        'ignore',
+        message='.*coroutine.*was never awaited.*',
+        category=RuntimeWarning,
+    )
+
+    # Suppress tracemalloc warnings that often accompany the coroutine warnings
+    warnings.filterwarnings(
+        'ignore',
+        message='.*Enable tracemalloc to get the object allocation traceback.*',
+        category=RuntimeWarning,
+    )
+
 
 # Apply warning suppressions when module is imported
 suppress_cli_warnings()
