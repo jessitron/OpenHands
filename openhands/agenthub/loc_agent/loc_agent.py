@@ -5,10 +5,13 @@ from openhands.agenthub.codeact_agent import CodeActAgent
 from openhands.core.config import AgentConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.llm.llm import LLM
+from opentelemetry import trace
 
 if TYPE_CHECKING:
     from openhands.events.action import Action
     from openhands.llm.llm import ModelResponse
+
+tracer = trace.get_tracer(__name__)
 
 
 class LocAgent(CodeActAgent):
@@ -19,18 +22,22 @@ class LocAgent(CodeActAgent):
         llm: LLM,
         config: AgentConfig,
     ) -> None:
-        """Initializes a new instance of the LocAgent class.
+        with tracer.start_as_current_span("initialize local agent") as span:
+            """Initializes a new instance of the LocAgent class.
 
-        Parameters:
-        - llm (LLM): The llm to be used by this agent
-        - config (AgentConfig): The configuration for the agent
-        """
-        super().__init__(llm, config)
+            Parameters:
+            - llm (LLM): The llm to be used by this agent
+            - config (AgentConfig): The configuration for the agent
+            """
+            super().__init__(llm, config)
 
-        self.tools = locagent_function_calling.get_tools()
-        logger.debug(
-            f'TOOLS loaded for LocAgent: {", ".join([tool.get("function").get("name") for tool in self.tools])}'
-        )
+            self.tools = locagent_function_calling.get_tools()
+            logger.debug(
+                f'TOOLS loaded for LocAgent: {", ".join([tool.get("function").get("name") for tool in self.tools])}'
+            )
+            span.set_attribute(
+                "app.tool_names", str([tool.get("function").get("name") for tool in self.tools])
+            )
 
     def response_to_actions(self, response: 'ModelResponse') -> list['Action']:
         return locagent_function_calling.response_to_actions(

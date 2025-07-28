@@ -19,7 +19,7 @@ from openhands.core.logger import openhands_logger as logger
 from openhands.events.event import EventSource
 from openhands.llm.llm import LLM
 from openhands.runtime.plugins import PluginRequirement
-
+from opentelemetry import trace
 
 class Agent(ABC):
     DEPRECATED = False
@@ -166,6 +166,9 @@ class Agent(ABC):
         logger.info(
             f'Setting {len(mcp_tools)} MCP tools for agent {self.name}: {[tool["function"]["name"] for tool in mcp_tools]}'
         )
+        trace.get_current_span().set_attribute(
+            "app.mcp_tool_names", str([tool["function"]["name"] for tool in mcp_tools])
+        )
         for tool in mcp_tools:
             _tool = ChatCompletionToolParam(**tool)
             if _tool['function']['name'] in self.mcp_tools:
@@ -177,4 +180,7 @@ class Agent(ABC):
             self.tools.append(_tool)
         logger.info(
             f'Tools updated for agent {self.name}, total {len(self.tools)}: {[tool["function"]["name"] for tool in self.tools]}'
+        )
+        trace.get_current_span().set_attribute(
+            "app.updated_tool_names", str([tool.get("function").get("name") for tool in self.tools])
         )

@@ -28,6 +28,7 @@ from openhands.events.action import (
     MessageAction,
 )
 from openhands.events.tool import ToolCallMetadata
+from opentelemetry import trace
 
 
 def response_to_actions(
@@ -123,4 +124,5 @@ def get_tools() -> list[ChatCompletionToolParam]:
     tools.append(SearchRepoTool)
     tools.append(SearchEntityTool)
     tools.append(create_explore_tree_structure_tool(use_simplified_description=True))
+    trace.get_current_span().set_attribute("app.tools", str(tools))
     return tools

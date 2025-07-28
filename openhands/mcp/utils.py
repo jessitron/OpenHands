@@ -154,41 +154,48 @@ async def call_tool_mcp(mcp_clients: list[MCPClient], action: MCPAction) -> Obse
 
     from openhands.events.observation import ErrorObservation
 
-    # Skip MCP tools on Windows
-    if sys.platform == 'win32':
-        logger.info('MCP functionality is disabled on Windows')
-        return ErrorObservation('MCP functionality is not available on Windows')
+    with tracer.start_as_current_span("call_tool_mcp") as span:
+        span.set_attribute("app.action.name", action.name)
+        span.set_attribute("app.action.arguments", action.arguments)
 
-    if not mcp_clients:
-        raise ValueError('No MCP clients found')
+        # Skip MCP tools on Windows
+        if sys.platform == 'win32':
+            logger.info('MCP functionality is disabled on Windows')
+            return ErrorObservation('MCP functionality is not available on Windows')
 
-    logger.debug(f'MCP action received: {action}')
+        if not mcp_clients:
+            raise ValueError('No MCP clients found')
 
-    # Find the MCP client that has the matching tool name
-    matching_client = None
-    logger.debug(f'MCP clients: {mcp_clients}')
-    logger.debug(f'MCP action name: {action.name}')
+        span.set_attribute("app.action", str(action))
+        logger.debug(f'MCP action received: {action}')
 
-    for client in mcp_clients:
-        logger.debug(f'MCP client tools: {client.tools}')
-        if action.name in [tool.name for tool in client.tools]:
-            matching_client = client
-            break
+        # Find the MCP client that has the matching tool name
+        matching_client = None
+        logger.debug(f'MCP clients: {mcp_clients}')
+        logger.debug(f'MCP action name: {action.name}')
 
-    if matching_client is None:
-        raise ValueError(f'No matching MCP agent found for tool name: {action.name}')
+        for client in mcp_clients:
+            logger.debug(f'MCP client tools: {client.tools}')
+            if action.name in [tool.name for tool in client.tools]:
+                matching_client = client
+                break
 
-    logger.debug(f'Matching client: {matching_client}')
+        if matching_client is None:
+            raise ValueError(f'No matching MCP agent found for tool name: {action.name}')
 
-    # Call the tool - this will create a new connection internally
-    response = await matching_client.call_tool(action.name, action.arguments)
-    logger.debug(f'MCP response: {response}')
+        span.set_attribute("app.matching_client", str(matching_client))
+        logger.debug(f'Matching client: {matching_client}')
 
-    return MCPObservation(
-        content=json.dumps(response.model_dump(mode='json')),
-        name=action.name,
-        arguments=action.arguments,
-    )
+        # Call the tool - this will create a new connection internally
+        response = await matching_client.call_tool(action.name, action.arguments)
+        logger.debug(f'MCP response: {response}')
+        span.set_attribute("app.response", str(response))
+
+        return MCPObservation(
+            content=json.dumps(response.model_dump(mode='json')),
+            name=action.name,
+            arguments=action.arguments,
+        )
 
 
 async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memory'):
@@ -227,10 +234,10 @@ async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memo
 
     # Add the runtime as another MCP server
     updated_mcp_config = runtime.get_mcp_config(extra_stdio_servers)
- 
+
     # Fetch the MCP tools
     with tracer.start_as_current_span("fetch_mcp_tools_from_config") as span:
-        span.set_attribute("app.mcp_config", updated_mcp_config.model_dump(mode='json'))
+        span.set_attribute("app.mcp_config", str(updated_mcp_config))
         mcp_tools = await fetch_mcp_tools_from_config(updated_mcp_config)
 
     logger.info(

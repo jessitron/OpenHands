@@ -178,32 +178,38 @@ async def run_session(
     usage_metrics = UsageMetrics()
 
     async def prompt_for_next_task(agent_state: str) -> None:
-        nonlocal reload_microagents, new_session_requested, exit_reason
-        while True:
-            next_message = await read_prompt_input(
-                config, agent_state, multiline=config.cli_multiline_input
-            )
+        with tracer.start_as_current_span("prompt_for_next_task") as span:
+            nonlocal reload_microagents, new_session_requested, exit_reason
+            while True:
+                next_message = await read_prompt_input(
+                    config, agent_state, multiline=config.cli_multiline_input
+                )
+                span.add_event("read_prompt_input", {"app.next_message": next_message})
 
-            if not next_message.strip():
-                continue
+                if not next_message.strip():
+                    continue
 
-            (
-                close_repl,
-                reload_microagents,
-                new_session_requested,
-                exit_reason,
-            ) = await handle_commands(
-                next_message,
-                event_stream,
-                usage_metrics,
-                sid,
-                config,
-                current_dir,
-                settings_store,
-            )
+                (
+                    close_repl,
+                    reload_microagents,
+                    new_session_requested,
+                    exit_reason,
+                ) = await handle_commands(
+                    next_message,
+                    event_stream,
+                    usage_metrics,
+                    sid,
+                    config,
+                    current_dir,
+                    settings_store,
+                )
+                span.set_attribute("app.close_repl", close_repl)
+                span.set_attribute("app.reload_microagents", reload_microagents)
+                span.set_attribute("app.new_session_requested", new_session_requested)
+                span.set_attribute("app.exit_reason", exit_reason)
 
-            if close_repl:
-                return
+                if close_repl:
+                    return
 
     async def on_event_async(event: Event) -> None:
         nonlocal reload_microagents, is_paused, always_confirm_mode
@@ -304,6 +310,9 @@ async def run_session(
                 OpenHandsMCPConfigImpl.create_default_mcp_server_config(
                     config.mcp_host, config, None
                 )
+            )
+            span.set_attribute(
+                "app.openhands_mcp_stdio_servers", str(openhands_mcp_stdio_servers)
             )
             runtime.config.mcp.stdio_servers.extend(openhands_mcp_stdio_servers)
 
