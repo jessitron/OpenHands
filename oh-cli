@@ -30,4 +30,4 @@ export SANDBOX_VOLUMES="/workspaces/simple-web-page:/workspace:rw"
 # If you haven't yet:
 # poetry install
 
-poetry run opentelemetry-instrument --logs_exporter otlp --metrics_exporter none python -m openhands.cli.main --log-level warn
+poetry run opentelemetry-instrument --logs_exporter otlp --metrics_exporter none python -m openhands.cli.main --log-level info
