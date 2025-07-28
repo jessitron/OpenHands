@@ -239,9 +239,7 @@ async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memo
     )
 
     # Fetch the MCP tools
-    with tracer.start_as_current_span("fetch_mcp_tools_from_config") as span:
-        span.set_attribute("app.mcp_config", str(updated_mcp_config))
-        mcp_tools = await fetch_mcp_tools_from_config(updated_mcp_config)
+    mcp_tools = await fetch_mcp_tools_from_config(updated_mcp_config)
 
     logger.info(
         f'Loaded {len(mcp_tools)} MCP tools: {[tool["function"]["name"] for tool in mcp_tools]}'

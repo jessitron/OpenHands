@@ -34,7 +34,6 @@ export OTEL_LOG_LEVEL=info
 # NOTSET = 0
 
 export SANDBOX_VOLUMES="/workspaces/simple-web-page:/workspace:rw"
-export LOG_LEVEL=info   # maybe this will work?
 
 # If you haven't yet:
 # poetry install

@@ -305,18 +305,17 @@ async def run_session(
     span.set_attribute("app.enable_mcp", agent.config.enable_mcp)
     if agent.config.enable_mcp:
         # Add OpenHands' MCP server by default
-        with tracer.start_as_current_span("add_openhands_mcp_server") as span:
-            _, openhands_mcp_stdio_servers = (
-                OpenHandsMCPConfigImpl.create_default_mcp_server_config(
-                    config.mcp_host, config, None
-                )
+        _, openhands_mcp_stdio_servers = (
+            OpenHandsMCPConfigImpl.create_default_mcp_server_config(
+                config.mcp_host, config, None
             )
-            span.set_attribute(
-                "app.openhands_mcp_stdio_servers", str(openhands_mcp_stdio_servers)
-            )
-            runtime.config.mcp.stdio_servers.extend(openhands_mcp_stdio_servers)
+        )
+        span.set_attribute(
+            "app.openhands_mcp_stdio_servers", str(openhands_mcp_stdio_servers)
+        )
+        runtime.config.mcp.stdio_servers.extend(openhands_mcp_stdio_servers)
 
-            await add_mcp_tools_to_agent(agent, runtime, memory)
+        await add_mcp_tools_to_agent(agent, runtime, memory)
 
     # Clear loading animation
     is_loaded.set()
@@ -575,6 +574,7 @@ def print_link_to_current_trace() -> None:
     print(
         f"Link to current trace: https://ui.honeycomb.io/modernity/environments/openhands/trace?trace_id={trace_id_in_hex_string}"
     )
+    print(f"https://jaeger.jessitron.honeydemo.io/trace/{trace_id_in_hex_string}")
 
 if __name__ == '__main__':
     with tracer.start_as_current_span("main"):
