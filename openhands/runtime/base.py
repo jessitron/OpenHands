@@ -31,6 +31,7 @@ from openhands.events.action import (
     FileReadAction,
     FileWriteAction,
     IPythonRunCellAction,
+    WebSearchAction,
 )
 from openhands.events.action.mcp import MCPAction
 from openhands.events.event import Event
@@ -990,6 +991,10 @@ fi
 
     @abstractmethod
     def browse_interactive(self, action: BrowseInteractiveAction) -> Observation:
+        pass
+
+    @abstractmethod
+    def web_search(self, action: WebSearchAction) -> Observation:
         pass
 
     @abstractmethod

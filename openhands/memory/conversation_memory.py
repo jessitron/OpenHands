@@ -33,6 +33,7 @@ from openhands.events.observation import (
     FileReadObservation,
     IPythonRunCellObservation,
     UserRejectObservation,
+    WebSearchObservation,
 )
 from openhands.events.observation.agent import (
     MicroagentKnowledge,
@@ -346,6 +347,7 @@ class ConversationMemory:
         - ErrorObservation: Formats error messages from failed actions
         - UserRejectObservation: Formats user rejection messages
         - FileDownloadObservation: Formats the result of a browsing action that opened/downloaded a file
+        - WebSearchObservation: Formats the result of a web search operation
 
         In function calling mode, observations with tool_call_metadata are stored in
         tool_call_id_to_message for later processing instead of being returned immediately.
@@ -500,6 +502,9 @@ class ConversationMemory:
             text = truncate_content(obs.content, max_message_chars)
             message = Message(role='user', content=[TextContent(text=text)])
         elif isinstance(obs, FileDownloadObservation):
+            text = truncate_content(obs.content, max_message_chars)
+            message = Message(role='user', content=[TextContent(text=text)])
+        elif isinstance(obs, WebSearchObservation):
             text = truncate_content(obs.content, max_message_chars)
             message = Message(role='user', content=[TextContent(text=text)])
         elif (

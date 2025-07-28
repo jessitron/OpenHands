@@ -55,3 +55,6 @@ class ObservationType(str, Enum):
 
     DOWNLOAD = 'download'
     """Result of downloading/opening a file via the browser"""
+
+    WEB_SEARCH = 'web_search'
+    """Result of a web search operation"""

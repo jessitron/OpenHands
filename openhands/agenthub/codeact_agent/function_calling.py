@@ -36,6 +36,7 @@ from openhands.events.action import (
     FileReadAction,
     IPythonRunCellAction,
     MessageAction,
+    WebSearchAction,
 )
 from openhands.events.action.agent import CondensationRequestAction
 from openhands.events.action.mcp import MCPAction
@@ -250,11 +251,9 @@ def response_to_actions(
                         raise FunctionCallValidationError(
                             f'Missing required argument "query" in tool call {tool_call.function.name}'
                         )
-                    # For now, return a hardcoded response via CmdRunAction
-                    # This will be replaced with actual web search implementation later
+                    # Create a proper WebSearchAction instead of CmdRunAction
                     search_query = arguments['query']
-                    hardcoded_response = f"Web search results for '{search_query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
-                    action = CmdRunAction(command=f'echo "{hardcoded_response}"')
+                    action = WebSearchAction(query=search_query)
 
                 # ================================================
                 # MCPAction (MCP)

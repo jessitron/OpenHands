@@ -36,6 +36,7 @@ from openhands.events.action import (
     FileReadAction,
     FileWriteAction,
     IPythonRunCellAction,
+    WebSearchAction,
 )
 from openhands.events.action.mcp import MCPAction
 from openhands.events.event import FileEditSource, FileReadSource
@@ -46,6 +47,7 @@ from openhands.events.observation import (
     FileReadObservation,
     FileWriteObservation,
     Observation,
+    WebSearchObservation,
 )
 from openhands.integrations.provider import PROVIDER_TOKEN_TYPE
 from openhands.runtime.base import Runtime
@@ -442,6 +444,30 @@ class CLIRuntime(Runtime):
                 metadata=obs_metadata,
             )
 
+    def _execute_web_search(self, query: str) -> WebSearchObservation:
+        """Execute a web search and return hardcoded results.
+
+        This is a placeholder implementation that returns hardcoded search results.
+        In a real implementation, this would call an actual web search API.
+
+        Args:
+            query: The search query string
+
+        Returns:
+            WebSearchObservation with hardcoded search results
+        """
+        logger.debug(f'[_execute_web_search] Executing web search for query: "{query}"')
+
+        # Hardcoded response - this is where actual web search would happen
+        hardcoded_response = f"Web search results for '{query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
+
+        logger.debug(f'[_execute_web_search] Returning hardcoded response: {hardcoded_response}')
+
+        return WebSearchObservation(
+            query=query,
+            content=hardcoded_response,
+        )
+
     def run(self, action: CmdRunAction) -> Observation:
         """Run a command using subprocess."""
         if not self._runtime_initialized:
@@ -609,6 +635,26 @@ class CLIRuntime(Runtime):
         return ErrorObservation(
             'Browser functionality is not implemented in CLIRuntime'
         )
+
+    def web_search(self, action: WebSearchAction) -> Observation:
+        """Execute a web search action."""
+        if not self._runtime_initialized:
+            return ErrorObservation(
+                f'Runtime not initialized for web search: {action.query}'
+            )
+
+        try:
+            logger.debug(
+                f'Executing web search in CLIRuntime: "{action.query}"'
+            )
+            return self._execute_web_search(action.query)
+        except Exception as e:
+            logger.error(
+                f'Error in CLIRuntime.web_search for query "{action.query}": {str(e)}'
+            )
+            return ErrorObservation(
+                f'Error executing web search for "{action.query}": {str(e)}'
+            )
 
     def _execute_file_editor(
         self,

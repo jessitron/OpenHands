@@ -1,0 +1,24 @@
+from dataclasses import dataclass
+
+from openhands.core.schema import ObservationType
+from openhands.events.observation.observation import Observation
+
+
+@dataclass
+class WebSearchObservation(Observation):
+    """This data class represents the result of a web search operation."""
+
+    query: str
+    observation: str = ObservationType.WEB_SEARCH
+
+    @property
+    def message(self) -> str:
+        return f'Web search completed for query: {self.query}'
+
+    def __str__(self) -> str:
+        ret = f'**WebSearchObservation (source={self.source})**\n'
+        ret += f'QUERY: {self.query}\n'
+        ret += '--BEGIN WEB SEARCH RESULTS--\n'
+        ret += f'{self.content}\n'
+        ret += '--END WEB SEARCH RESULTS--'
+        return ret
