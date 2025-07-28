@@ -30,54 +30,13 @@ def test_web_search_tool_basic(temp_dir):
         # This simulates what the function calling system would do
         search_query = "cats and dogs"
         hardcoded_response = f"Web search results for '{search_query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
-        
+
         obs = _run_cmd_action(runtime, f'echo "{hardcoded_response}"')
         assert obs.exit_code == 0
         assert search_query in obs.content
         assert "[HARDCODED]" in obs.content
         assert "Found 3 images and 5 web pages" in obs.content
-        
+
     finally:
         _close_test_runtime(runtime)
 
-
-def test_web_search_tool_different_queries(temp_dir):
-    """Test the web search tool with different query types."""
-    runtime_cls = CLIRuntime
-    runtime, config = _load_runtime(temp_dir, runtime_cls)
-    try:
-        test_queries = [
-            "python programming",
-            "machine learning images",
-            "sunset photography",
-            "data visualization examples"
-        ]
-        
-        for query in test_queries:
-            hardcoded_response = f"Web search results for '{query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
-            obs = _run_cmd_action(runtime, f'echo "{hardcoded_response}"')
-            assert obs.exit_code == 0
-            assert query in obs.content
-            assert "[HARDCODED]" in obs.content
-            
-    finally:
-        _close_test_runtime(runtime)
-
-
-def test_web_search_tool_special_characters(temp_dir):
-    """Test the web search tool with special characters in queries."""
-    runtime_cls = CLIRuntime
-    runtime, config = _load_runtime(temp_dir, runtime_cls)
-    try:
-        # Test with query containing special characters
-        query = "C++ programming & algorithms"
-        # Escape special characters for shell command
-        escaped_query = query.replace("&", "\\&").replace("+", "\\+")
-        hardcoded_response = f"Web search results for '{escaped_query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
-        
-        obs = _run_cmd_action(runtime, f'echo "{hardcoded_response}"')
-        assert obs.exit_code == 0
-        assert "[HARDCODED]" in obs.content
-        
-    finally:
-        _close_test_runtime(runtime)

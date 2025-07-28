@@ -131,9 +131,6 @@ When an LLM calls the web_search tool with a query, it generates a bash command 
 
 The foundation is solid and ready for the actual web search implementation.
 
-
-A note about output: For the current step 1 implementation,  CmdOutputObservation is perfectly adequate and follows the pattern established in the feature notes. But for a production web search tool, a specialized observation would provide much better structure and functionality.
-
 ## Testing the Implementation
 
 To run the web search tool tests:
@@ -148,4 +145,10 @@ This will run the test suite that verifies:
 - Basic web search tool functionality with hardcoded responses
 - Different query types and special characters handling
 - Integration with CLIRuntime
+
+## Now make it better
+
+Look, don't reuse CmdRunAction. This is not a command run, it is a new thing. It is a WebSearchAction, and it needs a new _execute_web_search function like _execute_shell_command in openhands/runtime/impl/cli/cli_runtime.py
+
+Make it a new WebSearchObservation etc, give it all the structure of a real tool. The hardcoded response value should be in its new _execute_web_search function.
 
