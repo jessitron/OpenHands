@@ -90,9 +90,9 @@ class ConversationMemory:
             vision_is_active: Whether vision is active in the LLM. If True, image URLs will be included.
             initial_user_action: The initial user message action, if available. Used to ensure the conversation starts correctly.
         """
-        with tracer.start_as_current_span("process_events") as current_span:
+        with tracer.start_as_current_span("process_events") as span:
             events = condensed_history
-            current_span.set_attribute('app.conversation.total_events', len(events))
+            span.set_attribute('app.conversation.event_count', len(events))
 
             # Ensure the event list starts with SystemMessageAction, then MessageAction(source='user')
             self._ensure_system_message(events)
@@ -107,17 +107,21 @@ class ConversationMemory:
             # Process regular events
             pending_tool_call_action_messages: dict[str, Message] = {}
             tool_call_id_to_message: dict[str, Message] = {}
-            current_span.set_attribute('app.conversation.initial_messages_count', len(messages))
 
             for i, event in enumerate(events):
                 # create a regular message from an event
                 if isinstance(event, Action):
+                    span.add_event("process_action", {"app.action": str(event), "app.action_type": type(event).__name__,
+                                                      "app.pending_tool_call_action_messages": str(pending_tool_call_action_messages),
+                                                      "app.tool_call_id_to_message": str(tool_call_id_to_message)})
                     messages_to_add = self._process_action(
                         action=event,
                         pending_tool_call_action_messages=pending_tool_call_action_messages,
                         vision_is_active=vision_is_active,
                     )
                 elif isinstance(event, Observation):
+                    span.add_event("process_observation", {"app.observation": str(event), "app.observation_type": type(event).__name__,
+                                                      "app.tool_call_id_to_message": str(tool_call_id_to_message)})
                     messages_to_add = self._process_observation(
                         obs=event,
                         tool_call_id_to_message=tool_call_id_to_message,
@@ -129,8 +133,10 @@ class ConversationMemory:
                     )
                 else:
                     raise ValueError(f'Unknown event type: {type(event)}')
-                current_span.set_attribute('app.conversation.added_action_messages', str(messages_to_add))
+                span.set_attribute('app.conversation.added_action_messages', str(messages_to_add))
+                span.set_attribute('app.conversation.messages_count', len(messages_to_add))
 
+                span.set_attribute("app.pending_tool_call_action_messages", str(pending_tool_call_action_messages))
                 # Check pending tool call action messages and see if they are complete
                 _response_ids_to_remove = []
                 for (
@@ -156,6 +162,9 @@ class ConversationMemory:
                             messages_to_add.append(tool_response_msg)
                             tool_call_id_to_message.pop(tool_call.id)
                         _response_ids_to_remove.append(response_id)
+                        span.add_event("adding message and tool call responses", {"app.pending_message": str(pending_message)})
+                    else:
+                        span.add_event("message still waiting for tools to complete", {"app.pending_message": str(pending_message)})
 
                 # Cleanup the processed pending tool messages
                 for response_id in _response_ids_to_remove:
@@ -165,7 +174,9 @@ class ConversationMemory:
 
             # Apply final filtering so that the messages in context don't have unmatched tool calls
             # and tool responses, for example
+            span.set_attribute('app.conversation.messages_before_filter', len(messages))
             messages = list(ConversationMemory._filter_unmatched_tool_calls(messages))
+            span.set_attribute('app.conversation.messages_after_filter', len(messages))
 
             # Apply final formatting
             messages = self._apply_user_message_formatting(messages)
