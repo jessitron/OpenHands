@@ -58,6 +58,7 @@ from openhands.events.action import (
     MessageAction,
     NullAction,
     SystemMessageAction,
+    WebSearchAction,
 )
 from openhands.events.action.agent import (
     CondensationAction,
@@ -866,7 +867,7 @@ class AgentController:
 
         if action.runnable:
             if self.state.confirmation_mode and (
-                type(action) is CmdRunAction or type(action) is IPythonRunCellAction
+                type(action) is CmdRunAction or type(action) is IPythonRunCellAction or type(action) is WebSearchAction
             ):
                 action.confirmation_state = (
                     ActionConfirmationStatus.AWAITING_CONFIRMATION
