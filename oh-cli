@@ -24,8 +24,17 @@ export OTEL_LOG_LEVEL=info
 #     'DEBUG': DEBUG,
 #     'NOTSET': NOTSET,
 # }
+# CRITICAL = 50
+# FATAL = CRITICAL
+# ERROR = 40
+# WARNING = 30
+# WARN = WARNING
+# INFO = 20
+# DEBUG = 10
+# NOTSET = 0
 
 export SANDBOX_VOLUMES="/workspaces/simple-web-page:/workspace:rw"
+export LOG_LEVEL=info   # maybe this will work?
 
 # If you haven't yet:
 # poetry install

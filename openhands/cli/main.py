@@ -184,7 +184,7 @@ async def run_session(
                 next_message = await read_prompt_input(
                     config, agent_state, multiline=config.cli_multiline_input
                 )
-                span.add_event("read_prompt_input", {"app.next_message": next_message})
+                span.add_event("read: " + next_message, {"app.next_message": next_message})
 
                 if not next_message.strip():
                     continue
@@ -407,8 +407,9 @@ async def main_with_loop(loop: asyncio.AbstractEventLoop) -> None:
         # Set default log level to WARNING if no LOG_LEVEL environment variable is set
         # (command line argument takes precedence over environment variable)
         env_log_level = os.getenv('LOG_LEVEL')
-        trace.get_current_span().set_attribute("env.log_level", log_level)
+        trace.get_current_span().set_attribute("env.log_level", env_log_level)
         if not env_log_level:
+            trace.get_current_span().set_attribute("set.log_level", logging.WARNING)
             logger.setLevel(logging.WARNING)
 
     # Load config from toml and override with command line arguments
@@ -565,9 +566,18 @@ def main():
             print(f'Error during cleanup: {e}')
             sys.exit(1)
 
+def print_link_to_current_trace() -> None:
+    current_span = trace.get_current_span()
+    trace_id = current_span.get_span_context().trace_id
+    # how many digits in 6b4af30bab9ca7dab0284cb180ae8006 ?
+    # the trace_id needs to be the same number of digits
+    trace_id_in_hex_string = hex(trace_id)[2:].zfill(32)
+    print(
+        f"Link to current trace: https://ui.honeycomb.io/modernity/environments/openhands/trace?trace_id={trace_id_in_hex_string}"
+    )
 
 if __name__ == '__main__':
     with tracer.start_as_current_span("main"):
-        print("Jess was here")
         main()
+        print_link_to_current_trace()
         logger.warning("Exiting")

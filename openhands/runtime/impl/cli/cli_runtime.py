@@ -889,6 +889,7 @@ class CLIRuntime(Runtime):
         self, extra_stdio_servers: list[MCPStdioServerConfig] | None = None
     ) -> MCPConfig:
         # TODO: Load MCP config from a local file
+        logger.warning("get_mcp_config is not implemented in CLIRuntime")
         return MCPConfig()
 
     def subscribe_to_shell_stream(

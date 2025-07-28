@@ -234,6 +234,9 @@ async def add_mcp_tools_to_agent(agent: 'Agent', runtime: Runtime, memory: 'Memo
 
     # Add the runtime as another MCP server
     updated_mcp_config = runtime.get_mcp_config(extra_stdio_servers)
+    trace.get_current_span().set_attribute(
+        "app.updated_mcp_config", "mcp config: " + str(updated_mcp_config)
+    )
 
     # Fetch the MCP tools
     with tracer.start_as_current_span("fetch_mcp_tools_from_config") as span:
