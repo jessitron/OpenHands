@@ -18,6 +18,7 @@ from openhands.agenthub.codeact_agent.tools import (
     ThinkTool,
     create_cmd_run_tool,
     create_str_replace_editor_tool,
+    create_web_search_tool,
 )
 from openhands.core.exceptions import (
     FunctionCallNotExistsError,
@@ -240,6 +241,20 @@ def response_to_actions(
                             f'Missing required argument "code" in tool call {tool_call.function.name}'
                         )
                     action = BrowseInteractiveAction(browser_actions=arguments['code'])
+
+                # ================================================
+                # WebSearchTool
+                # ================================================
+                elif tool_call.function.name == create_web_search_tool()['function']['name']:
+                    if 'query' not in arguments:
+                        raise FunctionCallValidationError(
+                            f'Missing required argument "query" in tool call {tool_call.function.name}'
+                        )
+                    # For now, return a hardcoded response via CmdRunAction
+                    # This will be replaced with actual web search implementation later
+                    search_query = arguments['query']
+                    hardcoded_response = f"Web search results for '{search_query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
+                    action = CmdRunAction(command=f'echo "{hardcoded_response}"')
 
                 # ================================================
                 # MCPAction (MCP)

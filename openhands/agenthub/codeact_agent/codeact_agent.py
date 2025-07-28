@@ -21,6 +21,7 @@ from openhands.agenthub.codeact_agent.tools.llm_based_edit import LLMBasedFileEd
 from openhands.agenthub.codeact_agent.tools.str_replace_editor import (
     create_str_replace_editor_tool,
 )
+from openhands.agenthub.codeact_agent.tools.web_search import create_web_search_tool
 from openhands.agenthub.codeact_agent.tools.think import ThinkTool
 from openhands.controller.agent import Agent
 from openhands.controller.state.state import State
@@ -145,6 +146,8 @@ class CodeActAgent(Agent):
                     use_short_description=use_short_tool_desc
                 )
             )
+        # Add web search tool (hardcoded for CLI mode)
+        tools.append(create_web_search_tool(use_short_description=use_short_tool_desc))
         trace.get_current_span().set_attribute(
             "app.tool_names", str([tool.get("function").get("name") for tool in tools])
         )

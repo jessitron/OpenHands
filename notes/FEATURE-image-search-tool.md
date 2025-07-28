@@ -22,4 +22,84 @@ The tool implementation will be stubbed out, but let's make the CLI think it has
 
 What will you need to do to implement a new tool called WebSearchTool?
 
+### Analysis and Implementation Plan
+
+Based on my analysis of the codebase, here's what needs to be done to implement a new `WebSearchTool`:
+
+#### 1. Tool Definition Structure
+Following the pattern of existing tools like `bash.py`, I need to create:
+- A tool definition file: `openhands/agenthub/codeact_agent/tools/web_search.py`
+- A tool name constant in `openhands/llm/tool_names.py`
+- Integration in the agent's `_get_tools()` method in `codeact_agent.py`
+- Function calling support in `function_calling.py`
+- A corresponding action class if needed
+- Tests in `tests/runtime/test_web_search.py`
+
+#### 2. Tool Components Needed
+- **Tool Definition**: A `ChatCompletionToolParam` object with function name, description, and parameters
+- **Tool Name Constant**: Add `WEB_SEARCH_TOOL_NAME = 'web_search'` to `tool_names.py`
+- **Function Calling Handler**: Add a case in `response_to_actions()` to convert tool calls to actions
+- **Action Class**: Create a new action class or reuse existing ones (likely `CmdRunAction`)
+- **Runtime Integration**: Handle the tool execution in `cli_runtime.py`
+
+#### 3. Implementation Steps
+1. Create the tool definition with hardcoded response
+2. Add tool name constant
+3. Integrate tool into agent's tool list
+4. Add function calling support
+5. Create basic tests
+6. Test the integration
+
+#### 4. Tool Structure Pattern
+Looking at `bash.py`, the pattern is:
+```python
+def create_web_search_tool(use_short_description: bool = False) -> ChatCompletionToolParam:
+    return ChatCompletionToolParam(
+        type='function',
+        function=ChatCompletionToolParamFunctionChunk(
+            name=WEB_SEARCH_TOOL_NAME,
+            description="Search the web for images and information",
+            parameters={
+                'type': 'object',
+                'properties': {
+                    'query': {
+                        'type': 'string',
+                        'description': 'The search query to execute',
+                    },
+                },
+                'required': ['query'],
+            },
+        ),
+    )
+```
+
+This analysis shows that implementing a new tool requires coordinated changes across multiple files, following the established patterns in the codebase.
+
+## Step 1 Implementation - COMPLETED ✅
+
+I have successfully implemented the basic WebSearchTool structure with a hardcoded response. Here's what was accomplished:
+
+### Files Created/Modified:
+1. **`openhands/agenthub/codeact_agent/tools/web_search.py`** - Tool definition with hardcoded response
+2. **`openhands/llm/tool_names.py`** - Added `WEB_SEARCH_TOOL_NAME = 'web_search'`
+3. **`openhands/agenthub/codeact_agent/codeact_agent.py`** - Integrated tool into agent's `_get_tools()` method
+4. **`openhands/agenthub/codeact_agent/function_calling.py`** - Added function calling support
+5. **`openhands/agenthub/codeact_agent/tools/__init__.py`** - Exported the new tool
+6. **`tests/runtime/test_web_search.py`** - Basic tests for the tool
+
+### Verification Results:
+- ✅ Tool creation works correctly
+- ✅ Web search tool is loaded in the agent (shows up in tool list)
+- ✅ Function calling logic processes web search requests
+- ✅ Hardcoded response is generated correctly
+- ✅ Tool has proper parameters (requires 'query')
+
+### Current Behavior:
+When the agent receives a web search tool call with a query like "cats and dogs", it generates a `CmdRunAction` with the command:
+```bash
+echo "Web search results for 'cats and dogs': [HARDCODED] Found 3 images and 5 web pages related to your query."
+```
+
+The tool is now fully integrated into the CLI agent and ready for the next step of implementation.
+
 
