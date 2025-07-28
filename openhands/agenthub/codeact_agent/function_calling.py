@@ -278,6 +278,7 @@ def response_to_actions(
                     model_response=response,
                     total_calls_in_response=len(assistant_msg.tool_calls),
                 )
+                span.set_attribute('app.tool_call_metadata', str(action))
                 actions.append(action)
     else:
         actions.append(

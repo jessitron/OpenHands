@@ -476,6 +476,9 @@ class AgentController:
         self.log(
             log_level, str(observation_to_print), extra={'msg_type': 'OBSERVATION'}
         )
+        trace.get_current_span().add_event("observation", {"app.observation": str(observation), "app.observation_type": type(observation).__name__,
+                                                           "app.observation_cause": observation.cause,
+                                                           "app.pending_action": str(self._pending_action)})
 
         # TODO: these metrics come from the draft editor, and they get accumulated into controller's state metrics and the agent's llm metrics
         # In the future, we should have a more principled way to sharing metrics across all LLM instances for a given conversation
@@ -483,6 +486,7 @@ class AgentController:
             self.state_tracker.merge_metrics(observation.llm_metrics)
 
         # this happens for runnable actions and microagent actions
+
         if self._pending_action and self._pending_action.id == observation.cause:
             if self.state.agent_state == AgentState.AWAITING_USER_CONFIRMATION:
                 return
@@ -816,6 +820,7 @@ class AgentController:
             try:
                 with tracer.start_as_current_span("agent_step") as span:
                     span.set_attribute("app.agent_state", self.state.agent_state)
+                    span.set_attribute("app.full_state", str(self.state))
                     action = self.agent.step(self.state)
                     if action is None:
                         raise LLMNoActionError('No action was returned')
@@ -872,6 +877,7 @@ class AgentController:
                 action.confirmation_state = (
                     ActionConfirmationStatus.AWAITING_CONFIRMATION
                 )
+            span.set_attribute("app.pending_action", str(action))
             self._pending_action = action
 
         if not isinstance(action, NullAction):
@@ -888,6 +894,7 @@ class AgentController:
             self.event_stream.add_event(action, action._source)  # type: ignore [attr-defined]
 
         log_level = 'info' if LOG_ALL_EVENTS else 'debug'
+        span.add_event("action", {"app.action": str(action), "app.action_type": type(action).__name__})
         self.log(log_level, str(action), extra={'msg_type': 'ACTION'})
 
     @property

@@ -9,7 +9,13 @@ class WebSearchObservation(Observation):
     """This data class represents the result of a web search operation."""
 
     query: str
+    content: str
     observation: str = ObservationType.WEB_SEARCH
+
+    def __init__(self, query: str, content: str) -> None:
+        super().__init__(content)
+        self.query = query
+        self.content = content
 
     @property
     def message(self) -> str:

@@ -359,6 +359,13 @@ class Runtime(FileEditRuntimeMixin):
         observation._cause = event.id  # type: ignore[attr-defined]
         observation.tool_call_metadata = event.tool_call_metadata
 
+        # Debug logging for tool_call_metadata transfer
+        if hasattr(event, 'tool_call_metadata') and event.tool_call_metadata is not None:
+            self.log('debug', f'[_handle_action] Action {type(event).__name__} has tool_call_metadata: {event.tool_call_metadata.tool_call_id}')
+            self.log('debug', f'[_handle_action] Transferred tool_call_metadata to observation {type(observation).__name__}: {observation.tool_call_metadata.tool_call_id if observation.tool_call_metadata else "None"}')
+        else:
+            self.log('debug', f'[_handle_action] Action {type(event).__name__} has no tool_call_metadata')
+
         # this might be unnecessary, since source should be set by the event stream when we're here
         source = event.source if event.source else EventSource.AGENT
         if isinstance(observation, NullObservation):

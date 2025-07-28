@@ -436,7 +436,7 @@ class CLIRuntime(Runtime):
                     f'[The command timed out after {timeout:.1f} seconds.]'
                 )
                 # exit_code = -1 # This is already set if timed_out is True
-
+            span.set_attribute('app.complete_output', complete_output)
             return CmdOutputObservation(
                 command=command,
                 content=complete_output,
@@ -456,17 +456,24 @@ class CLIRuntime(Runtime):
         Returns:
             WebSearchObservation with hardcoded search results
         """
-        logger.debug(f'[_execute_web_search] Executing web search for query: "{query}"')
+        with tracer.start_as_current_span('execute_web_search') as span:
+            span.set_attribute('app.query', query)
+            # Hardcoded response - this is where actual web search would happen
+            hardcoded_response = f"Web search results for '{query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
 
-        # Hardcoded response - this is where actual web search would happen
-        hardcoded_response = f"Web search results for '{query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
+            logger.debug(f'[_execute_web_search] Returning hardcoded response: {hardcoded_response}')
+            span.set_attribute('app.response', hardcoded_response)
 
-        logger.debug(f'[_execute_web_search] Returning hardcoded response: {hardcoded_response}')
+            observation = WebSearchObservation(
+                query=query,
+                content=hardcoded_response,
+            )
 
-        return WebSearchObservation(
-            query=query,
-            content=hardcoded_response,
-        )
+            # Span attributes to check if tool_call_metadata gets set properly
+            span.set_attribute('app.observation', str(observation))
+            span.set_attribute('app.observation.tool_call_metadata', getattr(observation, "tool_call_metadata", "NOT_SET"))
+
+            return observation
 
     def run(self, action: CmdRunAction) -> Observation:
         """Run a command using subprocess."""
