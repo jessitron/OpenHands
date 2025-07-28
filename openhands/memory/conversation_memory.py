@@ -21,6 +21,7 @@ from openhands.events.action import (
 )
 from openhands.events.action.mcp import MCPAction
 from openhands.events.action.message import SystemMessageAction
+from openhands.events.action.web_search import WebSearchAction
 from openhands.events.event import Event, RecallType
 from openhands.events.observation import (
     AgentCondensationObservation,
@@ -250,6 +251,7 @@ class ConversationMemory:
                 BrowseInteractiveAction,
                 BrowseURLAction,
                 MCPAction,
+                WebSearchAction,
             ),
         ) or (isinstance(action, CmdRunAction) and action.source == 'agent'):
             tool_metadata = action.tool_call_metadata

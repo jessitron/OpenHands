@@ -24,9 +24,7 @@ class WebSearchObservation(Observation):
     def __str__(self) -> str:
         ret = f'**WebSearchObservation (source={self.source})**\n'
         ret += f'QUERY: {self.query}\n'
-        ret += '--BEGIN WEB SEARCH RESULTS--\n'
         ret += f'{self.content}\n'
-        ret += '--END WEB SEARCH RESULTS--'
         return ret
 
     def to_agent_observation(self) -> str:

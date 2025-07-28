@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from binaryornot.check import is_binary
+import requests
 from openhands_aci.editor.editor import OHEditor
 from openhands_aci.editor.exceptions import ToolError
 from openhands_aci.editor.results import ToolResult
@@ -458,15 +459,33 @@ class CLIRuntime(Runtime):
         """
         with tracer.start_as_current_span('execute_web_search') as span:
             span.set_attribute('app.query', query)
-            # Hardcoded response - this is where actual web search would happen
-            hardcoded_response = f"Web search results for '{query}': [HARDCODED] Found 3 images and 5 web pages related to your query."
 
-            logger.debug(f'[_execute_web_search] Returning hardcoded response: {hardcoded_response}')
-            span.set_attribute('app.response', hardcoded_response)
+            # get key from environment
+            search_api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
+
+            # TODO: error handling
+            # TODO: config. Config is a mess in this app
+            result = requests.get(
+                "https://api.search.brave.com/res/v1/images/search",
+                headers={
+                    "X-Subscription-Token": search_api_key,
+                },
+                params={
+                    "q": query,
+                    "count": 5,
+                    "country": "us",
+                    "search_lang": "en",
+                    "spellcheck": 1,
+                },
+            ).text
+
+
+            logger.debug(f'[_execute_web_search] Returning actual response: {result}')
+            span.set_attribute('app.response', result)
 
             observation = WebSearchObservation(
                 query=query,
-                content=hardcoded_response,
+                content=result,
             )
 
             # Span attributes to check if tool_call_metadata gets set properly

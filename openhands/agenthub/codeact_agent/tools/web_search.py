@@ -2,22 +2,18 @@ from litellm import ChatCompletionToolParam, ChatCompletionToolParamFunctionChun
 
 from openhands.llm.tool_names import WEB_SEARCH_TOOL_NAME
 
-_DETAILED_WEB_SEARCH_DESCRIPTION = """Search the web for images and information using Bravo web search.
-
-This tool allows you to search the web and find relevant images and information based on your query.
+_DETAILED_WEB_SEARCH_DESCRIPTION = """Search the web for images using Bravo web search.
 
 ### Usage
-* Provide a search query to find relevant web content and images
-* The tool will return search results including images, titles, and descriptions
+* Provide a search query to find relevant images
+* The tool will return search results including image URLs, titles, and descriptions
 * Results are formatted for easy consumption by the agent
 
-### Best Practices
-* Use specific and descriptive search queries for better results
-* Include relevant keywords related to what you're looking for
-* The tool is particularly useful for finding images and visual content
+### Hint
+* Later, you can use wget to download images
 """
 
-_SHORT_WEB_SEARCH_DESCRIPTION = """Search the web for images and information. Provide a search query to find relevant web content and images."""
+_SHORT_WEB_SEARCH_DESCRIPTION = """Search the web for images. Provide a search query to find relevant images."""
 
 
 def create_web_search_tool(
