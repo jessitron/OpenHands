@@ -146,9 +146,39 @@ This will run the test suite that verifies:
 - Different query types and special characters handling
 - Integration with CLIRuntime
 
-## Now make it better
+## Now make it better - COMPLETED ✅
 
 Look, don't reuse CmdRunAction. This is not a command run, it is a new thing. It is a WebSearchAction, and it needs a new _execute_web_search function like _execute_shell_command in openhands/runtime/impl/cli/cli_runtime.py
 
 Make it a new WebSearchObservation etc, give it all the structure of a real tool. The hardcoded response value should be in its new _execute_web_search function.
+
+### Implementation Completed
+
+I have successfully implemented the proper WebSearchAction and WebSearchObservation structure:
+
+#### Files Created/Modified:
+1. **`openhands/core/schema/action.py`** - Added `WEB_SEARCH = 'web_search'` to ActionType enum
+2. **`openhands/core/schema/observation.py`** - Added `WEB_SEARCH = 'web_search'` to ObservationType enum
+3. **`openhands/events/action/web_search.py`** - Created proper WebSearchAction class
+4. **`openhands/events/observation/web_search.py`** - Created proper WebSearchObservation class with `to_agent_observation()` method
+5. **`openhands/agenthub/codeact_agent/function_calling.py`** - Updated to use WebSearchAction instead of CmdRunAction
+6. **`openhands/runtime/impl/cli/cli_runtime.py`** - Added `_execute_web_search()` method and `web_search()` action handler
+7. **`openhands/runtime/base.py`** - Added abstract `web_search()` method
+8. **`openhands/memory/conversation_memory.py`** - Added WebSearchObservation support
+9. **All serialization and import files** - Updated to include new action and observation classes
+10. **`tests/runtime/test_web_search.py`** - Updated tests to use WebSearchAction/WebSearchObservation
+
+#### Current Status:
+- ✅ WebSearchAction and WebSearchObservation classes implemented following OpenHands patterns
+- ✅ Proper action/observation structure instead of reusing CmdRunAction
+- ✅ Hardcoded response moved to `_execute_web_search()` method in CLIRuntime
+- ✅ All imports and registrations updated
+- ✅ Conversation memory support added
+- ✅ Tests updated and passing
+- ✅ Tool is properly registered and available to the agent
+
+#### Known Issue:
+The agent currently gets stuck in a loop when asked "can you search the web" because it interprets this as a question about capabilities rather than a request to perform a search. The tool works correctly when given a specific search query, but the agent needs better prompting to understand when to use the tool.
+
+The web search tool now has the complete structure of a first-class tool in the OpenHands system, with proper action/observation classes, runtime integration, and conversation memory support.
 

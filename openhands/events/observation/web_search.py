@@ -22,3 +22,7 @@ class WebSearchObservation(Observation):
         ret += f'{self.content}\n'
         ret += '--END WEB SEARCH RESULTS--'
         return ret
+
+    def to_agent_observation(self) -> str:
+        """Return the content formatted for the agent."""
+        return self.content
