@@ -40,7 +40,9 @@ from openhands.runtime.plugins import (
     PluginRequirement,
 )
 from openhands.utils.prompt import PromptManager
+from opentelemetry import trace
 
+tracer = trace.get_tracer(__name__)
 
 class CodeActAgent(Agent):
     VERSION = '2.2'
@@ -82,16 +84,17 @@ class CodeActAgent(Agent):
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
         """
-        super().__init__(llm, config)
-        self.pending_actions: deque['Action'] = deque()
-        self.reset()
-        self.tools = self._get_tools()
+        with tracer.start_as_current_span("initialize codeact agent") as span:
+            super().__init__(llm, config)
+            self.pending_actions: deque['Action'] = deque()
+            self.reset()
+            self.tools = self._get_tools()
 
-        # Create a ConversationMemory instance
-        self.conversation_memory = ConversationMemory(self.config, self.prompt_manager)
+            # Create a ConversationMemory instance
+            self.conversation_memory = ConversationMemory(self.config, self.prompt_manager)
 
-        self.condenser = Condenser.from_config(self.config.condenser)
-        logger.debug(f'Using condenser: {type(self.condenser)}')
+            self.condenser = Condenser.from_config(self.config.condenser)
+            logger.debug(f'Using condenser: {type(self.condenser)}')
 
     @property
     def prompt_manager(self) -> PromptManager:
@@ -116,6 +119,9 @@ class CodeActAgent(Agent):
             )
 
         tools = []
+        trace.get_current_span().set_attribute(
+            "app.codeact.config", str(self.config)
+        )
         if self.config.enable_cmd:
             tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
         if self.config.enable_think:
@@ -139,6 +145,9 @@ class CodeActAgent(Agent):
                     use_short_description=use_short_tool_desc
                 )
             )
+        trace.get_current_span().set_attribute(
+            "app.tool_names", str([tool.get("function").get("name") for tool in tools])
+        )
         return tools
 
     def reset(self) -> None:
