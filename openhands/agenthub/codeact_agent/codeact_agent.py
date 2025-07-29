@@ -149,7 +149,7 @@ class CodeActAgent(Agent):
                 )
             # Add web search tool (hardcoded for CLI mode)
             tools.append(WebSearchTool)
-            trace.get_current_span().set_attribute(
+            span.set_attribute(
                 "app.tool_names", str([tool.get("function").get("name") for tool in tools])
             )
             return tools
