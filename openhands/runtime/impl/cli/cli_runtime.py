@@ -458,14 +458,14 @@ class CLIRuntime(Runtime):
             WebSearchObservation with hardcoded search results
         """
         with tracer.start_as_current_span('execute_web_search') as span:
-            span.set_attribute('app.query', query)
+            trace.get_current_span().set_attribute('app.query', query)
 
             # get key from environment
+            # TODO: config. Config is a mess in this app
             search_api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
             span.set_attribute('app.search_api_key_exists', search_api_key is not None)
 
             # TODO: error handling
-            # TODO: config. Config is a mess in this app
             result = requests.get(
                 "https://api.search.brave.com/res/v1/images/search",
                 headers={
