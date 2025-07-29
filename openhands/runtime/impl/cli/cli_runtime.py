@@ -462,6 +462,7 @@ class CLIRuntime(Runtime):
 
             # get key from environment
             search_api_key = os.environ.get("BRAVE_SEARCH_API_KEY")
+            span.set_attribute('app.search_api_key_exists', search_api_key is not None)
 
             # TODO: error handling
             # TODO: config. Config is a mess in this app
