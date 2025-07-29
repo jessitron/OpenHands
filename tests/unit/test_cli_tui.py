@@ -14,6 +14,7 @@ from openhands.cli.tui import (
     display_shutdown_message,
     display_status,
     display_usage_metrics,
+    display_web_search,
     display_welcome_message,
     get_session_duration,
     read_confirmation_input,
@@ -25,6 +26,7 @@ from openhands.events.action import (
     ActionConfirmationStatus,
     CmdRunAction,
     MessageAction,
+    WebSearchAction,
 )
 from openhands.events.observation import (
     CmdOutputObservation,
@@ -166,6 +168,40 @@ class TestDisplayFunctions:
         mock_print_container.assert_called_once()
         container = mock_print_container.call_args[0][0]
         assert 'echo test' in container.body.text
+
+    @patch('openhands.cli.tui.display_web_search')
+    def test_display_event_web_search_action(self, mock_display_web_search):
+        config = MagicMock(spec=OpenHandsConfig)
+        # Test that web search queries awaiting confirmation are displayed
+        web_search_action = WebSearchAction(query='test search query')
+        web_search_action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+
+        display_event(web_search_action, config)
+
+        mock_display_web_search.assert_called_once_with(web_search_action)
+
+    @patch('openhands.cli.tui.display_web_search')
+    def test_display_event_web_search_action_confirmed(self, mock_display_web_search):
+        config = MagicMock(spec=OpenHandsConfig)
+        # Test that confirmed web searches don't display the query
+        web_search_action = WebSearchAction(query='test search query')
+        web_search_action.confirmation_state = ActionConfirmationStatus.CONFIRMED
+
+        display_event(web_search_action, config)
+
+        # Query should not be displayed (since it was already shown when awaiting confirmation)
+        mock_display_web_search.assert_not_called()
+
+    @patch('openhands.cli.tui.print_container')
+    def test_display_web_search_awaiting_confirmation(self, mock_print_container):
+        web_search_action = WebSearchAction(query='test search query')
+        web_search_action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION
+
+        display_web_search(web_search_action)
+
+        mock_print_container.assert_called_once()
+        container = mock_print_container.call_args[0][0]
+        assert 'test search query' in container.body.text
 
 
 class TestInteractiveCommandFunctions:

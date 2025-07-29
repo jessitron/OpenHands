@@ -37,6 +37,7 @@ from openhands.events.action import (
     ChangeAgentStateAction,
     CmdRunAction,
     MessageAction,
+    WebSearchAction,
 )
 from openhands.events.event import Event
 from openhands.events.observation import (
@@ -45,6 +46,7 @@ from openhands.events.observation import (
     ErrorObservation,
     FileEditObservation,
     FileReadObservation,
+    WebSearchObservation,
 )
 from openhands.llm.metrics import Metrics
 
@@ -215,6 +217,15 @@ def display_event(event: Event, config: OpenHandsConfig) -> None:
 
             if event.confirmation_state == ActionConfirmationStatus.CONFIRMED:
                 initialize_streaming_output()
+        elif isinstance(event, WebSearchAction):
+            # For WebSearchAction, display thought first, then query
+            if hasattr(event, 'thought') and event.thought:
+                display_message(event.thought)
+
+            # Only display the query if it's not already confirmed
+            # Web searches are always shown when AWAITING_CONFIRMATION, so we don't need to show them again when CONFIRMED
+            if event.confirmation_state != ActionConfirmationStatus.CONFIRMED:
+                display_web_search(event)
         elif isinstance(event, Action):
             # For other actions, display thoughts normally
             if hasattr(event, 'thought') and event.thought:
@@ -228,6 +239,8 @@ def display_event(event: Event, config: OpenHandsConfig) -> None:
                 display_thought_if_new(event.content)
         elif isinstance(event, CmdOutputObservation):
             display_command_output(event.content)
+        elif isinstance(event, WebSearchObservation):
+            display_web_search_output(event)
         elif isinstance(event, FileEditObservation):
             display_file_edit(event)
         elif isinstance(event, FileReadObservation):
@@ -278,6 +291,21 @@ def display_command(event: CmdRunAction) -> None:
     print_container(container)
 
 
+def display_web_search(event: WebSearchAction) -> None:
+    container = Frame(
+        TextArea(
+            text=f'Query: {event.query}',
+            read_only=True,
+            style=COLOR_GREY,
+            wrap_lines=True,
+        ),
+        title='Web Search',
+        style='ansiblue',
+    )
+    print_formatted_text('')
+    print_container(container)
+
+
 def display_command_output(output: str) -> None:
     lines = output.split('\n')
     formatted_lines = []
@@ -300,6 +328,21 @@ def display_command_output(output: str) -> None:
             wrap_lines=True,
         ),
         title='Command Output',
+        style=f'fg:{COLOR_GREY}',
+    )
+    print_formatted_text('')
+    print_container(container)
+
+
+def display_web_search_output(event: WebSearchObservation) -> None:
+    container = Frame(
+        TextArea(
+            text=event.content,
+            read_only=True,
+            style=COLOR_GREY,
+            wrap_lines=True,
+        ),
+        title=f'Web Search Results: {event.query}',
         style=f'fg:{COLOR_GREY}',
     )
     print_formatted_text('')
