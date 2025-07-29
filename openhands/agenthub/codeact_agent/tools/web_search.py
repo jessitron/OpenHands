@@ -7,26 +7,16 @@ _DETAILED_WEB_SEARCH_DESCRIPTION = """Search the web for images using Bravo web 
 ### Usage
 * Provide a search query to find relevant images
 * The tool will return search results including image URLs, titles, and descriptions
-* Results are formatted for easy consumption by the agent
 
 ### Hint
 * Later, you can use wget to download images
 """
 
-_SHORT_WEB_SEARCH_DESCRIPTION = """Search the web for images. Provide a search query to find relevant images."""
-
-
-def create_web_search_tool(
-    use_short_description: bool = False,
-) -> ChatCompletionToolParam:
-    description = (
-        _SHORT_WEB_SEARCH_DESCRIPTION if use_short_description else _DETAILED_WEB_SEARCH_DESCRIPTION
-    )
-    return ChatCompletionToolParam(
+WebSearchTool = ChatCompletionToolParam(
         type='function',
         function=ChatCompletionToolParamFunctionChunk(
             name=WEB_SEARCH_TOOL_NAME,
-            description=description,
+            description=_DETAILED_WEB_SEARCH_DESCRIPTION,
             parameters={
                 'type': 'object',
                 'properties': {

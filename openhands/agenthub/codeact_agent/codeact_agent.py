@@ -21,7 +21,7 @@ from openhands.agenthub.codeact_agent.tools.llm_based_edit import LLMBasedFileEd
 from openhands.agenthub.codeact_agent.tools.str_replace_editor import (
     create_str_replace_editor_tool,
 )
-from openhands.agenthub.codeact_agent.tools.web_search import create_web_search_tool
+from openhands.agenthub.codeact_agent.tools.web_search import WebSearchTool
 from openhands.agenthub.codeact_agent.tools.think import ThinkTool
 from openhands.controller.agent import Agent
 from openhands.controller.state.state import State
@@ -110,48 +110,49 @@ class CodeActAgent(Agent):
     def _get_tools(self) -> list['ChatCompletionToolParam']:
         # For these models, we use short tool descriptions ( < 1024 tokens)
         # to avoid hitting the OpenAI token limit for tool descriptions.
-        SHORT_TOOL_DESCRIPTION_LLM_SUBSTRS = ['gpt-', 'o3', 'o1', 'o4']
+        with tracer.start_as_current_span("get tools") as span:
+            SHORT_TOOL_DESCRIPTION_LLM_SUBSTRS = ['gpt-', 'o3', 'o1', 'o4']
 
-        use_short_tool_desc = False
-        if self.llm is not None:
-            use_short_tool_desc = any(
-                model_substr in self.llm.config.model
-                for model_substr in SHORT_TOOL_DESCRIPTION_LLM_SUBSTRS
-            )
-
-        tools = []
-        trace.get_current_span().set_attribute(
-            "app.codeact.config", str(self.config)
-        )
-        if self.config.enable_cmd:
-            tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
-        if self.config.enable_think:
-            tools.append(ThinkTool)
-        if self.config.enable_finish:
-            tools.append(FinishTool)
-        if self.config.enable_condensation_request:
-            tools.append(CondensationRequestTool)
-        if self.config.enable_browsing:
-            if sys.platform == 'win32':
-                logger.warning('Windows runtime does not support browsing yet')
-            else:
-                tools.append(BrowserTool)
-        if self.config.enable_jupyter:
-            tools.append(IPythonTool)
-        if self.config.enable_llm_editor:
-            tools.append(LLMBasedFileEditTool)
-        elif self.config.enable_editor:
-            tools.append(
-                create_str_replace_editor_tool(
-                    use_short_description=use_short_tool_desc
+            use_short_tool_desc = False
+            if self.llm is not None:
+                use_short_tool_desc = any(
+                    model_substr in self.llm.config.model
+                    for model_substr in SHORT_TOOL_DESCRIPTION_LLM_SUBSTRS
                 )
+
+            tools = []
+            trace.get_current_span().set_attribute(
+                "app.codeact.config", str(self.config)
             )
-        # Add web search tool (hardcoded for CLI mode)
-        # tools.append(create_web_search_tool(use_short_description=use_short_tool_desc))
-        trace.get_current_span().set_attribute(
-            "app.tool_names", str([tool.get("function").get("name") for tool in tools])
-        )
-        return tools
+            if self.config.enable_cmd:
+                tools.append(create_cmd_run_tool(use_short_description=use_short_tool_desc))
+            if self.config.enable_think:
+                tools.append(ThinkTool)
+            if self.config.enable_finish:
+                tools.append(FinishTool)
+            if self.config.enable_condensation_request:
+                tools.append(CondensationRequestTool)
+            if self.config.enable_browsing:
+                if sys.platform == 'win32':
+                    logger.warning('Windows runtime does not support browsing yet')
+                else:
+                    tools.append(BrowserTool)
+            if self.config.enable_jupyter:
+                tools.append(IPythonTool)
+            if self.config.enable_llm_editor:
+                tools.append(LLMBasedFileEditTool)
+            elif self.config.enable_editor:
+                tools.append(
+                    create_str_replace_editor_tool(
+                        use_short_description=use_short_tool_desc
+                    )
+                )
+            # Add web search tool (hardcoded for CLI mode)
+            tools.append(WebSearchTool)
+            trace.get_current_span().set_attribute(
+                "app.tool_names", str([tool.get("function").get("name") for tool in tools])
+            )
+            return tools
 
     def reset(self) -> None:
         """Resets the CodeAct Agent's internal state."""

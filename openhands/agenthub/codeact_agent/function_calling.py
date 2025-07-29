@@ -18,8 +18,8 @@ from openhands.agenthub.codeact_agent.tools import (
     ThinkTool,
     create_cmd_run_tool,
     create_str_replace_editor_tool,
-    create_web_search_tool,
 )
+from openhands.agenthub.codeact_agent.tools.web_search import WebSearchTool
 from openhands.core.exceptions import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -246,7 +246,7 @@ def response_to_actions(
                 # ================================================
                 # WebSearchTool
                 # ================================================
-                elif tool_call.function.name == create_web_search_tool()['function']['name']:
+                elif tool_call.function.name == WebSearchTool['function']['name']:
                     if 'query' not in arguments:
                         raise FunctionCallValidationError(
                             f'Missing required argument "query" in tool call {tool_call.function.name}'

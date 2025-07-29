@@ -739,7 +739,7 @@ class CLIRuntime(Runtime):
             if not result.output:
                 logger.warning(f'No output from file_editor for {path}')
                 return '', (None, None)
-
+            span.set_attribute('app.output', result.output)
             return result.output, (result.old_content, result.new_content)
 
     def edit(self, action: FileEditAction) -> Observation:
