@@ -15,6 +15,7 @@ from openhands.cli.tui import (
     display_status,
     display_usage_metrics,
     display_web_search,
+    display_web_search_output,
     display_welcome_message,
     get_session_duration,
     read_confirmation_input,
@@ -32,6 +33,7 @@ from openhands.events.observation import (
     CmdOutputObservation,
     FileEditObservation,
     FileReadObservation,
+    WebSearchObservation,
 )
 from openhands.llm.metrics import Metrics
 
@@ -202,6 +204,26 @@ class TestDisplayFunctions:
         mock_print_container.assert_called_once()
         container = mock_print_container.call_args[0][0]
         assert 'test search query' in container.body.text
+
+    @patch('openhands.cli.tui.display_web_search_output')
+    def test_display_event_web_search_observation(self, mock_display_web_search_output):
+        config = MagicMock(spec=OpenHandsConfig)
+        web_search_obs = WebSearchObservation(query='test query', content='search results')
+
+        display_event(web_search_obs, config)
+
+        mock_display_web_search_output.assert_called_once_with(web_search_obs)
+
+    @patch('openhands.cli.tui.print_container')
+    def test_display_web_search_output(self, mock_print_container):
+        web_search_obs = WebSearchObservation(query='test query', content='search results content')
+
+        display_web_search_output(web_search_obs)
+
+        mock_print_container.assert_called_once()
+        container = mock_print_container.call_args[0][0]
+        assert 'search results content' in container.body.text
+        assert container.title == 'Web Search Results: test query'
 
 
 class TestInteractiveCommandFunctions:
